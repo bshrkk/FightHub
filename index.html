@@ -21,7 +21,7 @@
 .resultlist{margin-top:14px}.note{color:var(--muted);font-size:12px;line-height:1.5;margin-top:14px}.foot{color:#737b8a;text-align:center;font-size:11px;line-height:1.6;padding:30px 0}
 @media(max-width:600px){.cards{grid-template-columns:1fr}.shell{padding:16px 14px 40px}.hero{padding:21px}.top{padding:13px 16px}}
 .eventlink{display:block;text-align:left;background:none;border:0;padding:0;color:var(--text);font-weight:800;font-size:16px;text-decoration:underline;text-decoration-color:var(--gold);text-underline-offset:4px}.fightrow{margin:10px 0;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}.fightrow strong{display:block;font-size:17px}.fightrow small{color:var(--muted)}.fightmeta{color:var(--gold);font-size:12px;margin-bottom:8px}.eventdetail h3{margin-top:24px}.eventdetail .btn{margin:8px 0}.eventdetail .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.eventdetail .card{padding:12px;min-width:0;overflow-wrap:anywhere}.eventdetail .card b{margin:4px 0 0}.eventdetail .card p{font-size:12px}
-.comparetable{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:12px 0}.comparerow{display:grid;grid-template-columns:minmax(0,1fr) repeat(2,minmax(0,1fr));gap:8px;padding:12px 8px;border-bottom:1px solid var(--line);align-items:start;overflow-wrap:anywhere;font-size:12px}.comparerow:last-child{border:0}.comparerow>span{color:var(--muted)}.comparehead{background:var(--panel2)}.comparehead button{font-size:13px;white-space:normal}.comparerow p{margin:0 0 8px}</style></head>
+.comparetable{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:12px 0}.comparerow{display:grid;grid-template-columns:minmax(0,1fr) repeat(2,minmax(0,1fr));gap:8px;padding:12px 8px;border-bottom:1px solid var(--line);align-items:start;overflow-wrap:anywhere;font-size:12px}.comparerow:last-child{border:0}.comparerow>span{color:var(--muted)}.comparehead{background:var(--panel2)}.comparehead button{font-size:13px;white-space:normal}.comparerow p{margin:0 0 8px}.fighterportrait{margin:0 0 18px;max-width:340px}.portraitframe{height:240px;display:grid;place-items:center;background:#151923;border:1px solid #414653;border-radius:16px;overflow:hidden}.portraitframe img{width:100%;height:240px;object-fit:contain}.portraitplaceholder{color:#747d8e}.portraitframe [hidden]{display:none!important}.fighterportrait figcaption{font-size:12px;line-height:1.5;margin-top:8px;overflow-wrap:anywhere}.fighterportrait a{color:#d7a25e}</style></head>
 <body>
 <header class="top"><div class="brand">FIGHT<span>HUB</span></div><div class="sub">The world of combat sports</div></header>
 <main class="shell">
@@ -152,6 +152,17 @@ async function showComparison(b,e){
  wrap.append(el("p","note","Source: MMA Calendar. — means not supplied. Records may overlap across disciplines; recent form is limited to available matching professional fight entries. Statistics are descriptive, not predictions."));
  if(ds.some(d=>!d)){const retry=el("button","btn","Retry comparison");retry.onclick=()=>showComparison(b,e);wrap.append(retry);}
 }
+function fighterPortrait(d){
+ const figure=el("figure","fighterportrait"), frame=el("div","portraitframe");
+ const placeholder=el("div","portraitplaceholder");placeholder.innerHTML='<svg viewBox="0 0 100 100" width="100" height="100" aria-hidden="true"><circle cx="50" cy="31" r="19" fill="currentColor"/><path d="M12 94V85a38 38 0 0 1 76 0v9z" fill="currentColor"/></svg>';frame.append(placeholder);figure.append(frame);
+ const caption=el("figcaption","note","Photograph unavailable");figure.append(caption);
+ const safeURL=v=>{try{const u=new URL(v);return u.protocol==="https:"?u.href:null;}catch{return null;}};
+ const photo=(Array.isArray(d.images)?d.images:[]).find(x=>x&&safeURL(x.url)&&x.artist&&x.license);
+ if(!photo)return figure;
+ const img=el("img","");img.alt=d.name;img.decoding="async";img.referrerPolicy="no-referrer";img.hidden=true;
+ img.onload=()=>{placeholder.hidden=true;img.hidden=false;caption.replaceChildren(document.createTextNode("Photo: "+photo.artist+" · "));const license=safeURL(photo.license_url);if(license){const a=el("a","",photo.license);a.href=license;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}else caption.append(document.createTextNode(photo.license));const source=safeURL(photo.source_page);if(source){const a=el("a",""," · Source");a.href=source;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}};
+ img.onerror=()=>{img.remove();placeholder.hidden=false;caption.textContent="Photograph unavailable";};frame.append(img);img.src=safeURL(photo.url);return figure;
+}
 async function showFighter(f,e){
  fighterProfileOpen=true;
  const token=++detailToken;view.replaceChildren();
@@ -163,6 +174,7 @@ async function showFighter(f,e){
  if(!d){const res=await fetch(eventURL+"fighters/"+encodeURIComponent(f.slug));if(!res.ok)throw Error("Unavailable");d=(await res.json()).data;if(!d||!d.name)throw Error("Invalid profile");fighterCache.set(f.slug,d);}
  if(token!==detailToken)return;
  wrap.replaceChildren(el("h2","",d.name),el("p","note",[d.nickname,d.nationality].filter(Boolean).join(" · ")));
+ wrap.prepend(fighterPortrait(d));
  const facts=el("div","cards");
  const add=(parent,label,value)=>{if(value===null||value===undefined||value==="")return;const c=el("article","card");c.append(el("p","",label),el("b","",String(value)));parent.append(c);};
  add(facts,"Height",d.height_inches!=null?Math.floor(d.height_inches/12)+" ft "+d.height_inches%12+" in":null);
@@ -185,7 +197,7 @@ async function showFighter(f,e){
  for(const b of completed){const row=el("article","fightrow");const result=String(b.result).toUpperCase();const meta=el("div","fightmeta",[result,b.weight_class,b.sport?.replace(/-/g," ")].filter(Boolean).join(" · "));if(["WIN","W"].includes(result))meta.style.color="var(--green)";if(["LOSS","L"].includes(result))meta.style.color="#ef9999";row.append(meta);const name=b.opponent_name||b.opponent?.name||"Opponent unknown";const slug=b.opponent_slug||b.opponent?.slug;if(slug){const link=el("button","eventlink","vs "+name);link.onclick=()=>showFighter({slug,name},e);row.append(link);}else row.append(el("strong","","vs "+name));row.append(el("p","note",[b.date,b.event_title||b.event_name].filter(Boolean).join(" · ")));const details=[b.method,b.round!=null?"Round "+b.round:null,b.time].filter(Boolean).join(" · ");if(details)row.append(el("p","",details));history.append(row);}
  }catch(err){if(token!==detailToken)return;history.replaceChildren(emptyBlock("⚠️","Career history unavailable","Try again later."));const retry=el("button","btn","Retry history");retry.onclick=()=>{history.replaceChildren(el("p","note","Loading career history…"));loadHistory();};history.append(retry);}};
  loadHistory();
- const save=el("button","btn","☆ Save fighter");save.onclick=()=>{if(!saved.some(x=>x.name===d.name&&x.type==="Fighter")){saved.push({name:d.name,type:"Fighter",category:d.nationality||"Combat sports"});persist();}save.textContent="★ Saved";};wrap.append(save,el("p","note","Source: MMA Calendar · Records are separated by discipline and may overlap. Most recent and next fight shown when supplied. Career history shows completed entries returned by the provider. Photos are not yet integrated."));
+ const save=el("button","btn","☆ Save fighter");save.onclick=()=>{if(!saved.some(x=>x.name===d.name&&x.type==="Fighter")){saved.push({name:d.name,type:"Fighter",category:d.nationality||"Combat sports"});persist();}save.textContent="★ Saved";};wrap.append(save,el("p","note","Source: MMA Calendar · Records are separated by discipline and may overlap. Most recent and next fight shown when supplied. Career history shows completed entries returned by the provider. Photos shown when licensed images are available."));
  }catch(err){if(token!==detailToken)return;wrap.replaceChildren(el("h2","",f.name),emptyBlock("⚠️","Profile unavailable","Try again later. The provider may have reached its request limit."));const retry=el("button","btn","Retry");retry.onclick=()=>showFighter(f,e);wrap.append(retry);}
 }
 
