@@ -218,9 +218,9 @@ async function showEvent(e){
  row.append(el("div","fightmeta",[b.cardSegment,b.weightClass,b.titleFight?"TITLE FIGHT":null,b.status].filter(Boolean).join(" · ")));
  const fs=Array.isArray(b.fighters)?b.fighters.filter(Boolean):[];
  const matchup=el("div","formrow");
- fs.forEach((f,i)=>{if(i)matchup.append(el("span","","vs"));const name=f.fighterName||"TBC";const link=el("button","eventlink",name);link.disabled=!f.fighterName;link.onclick=()=>{page="fighters";search.value="";sport.value="";fighterQuery=name;fighterResults=[];fighterState="idle";render();const form=view.querySelector("form");if(form)form.requestSubmit();};matchup.append(link);});
+ fs.forEach((f,i)=>{if(i)matchup.append(el("span","","vs"));const name=f.fighterName||"TBC";const link=el("button","eventlink",name);link.disabled=!f.fighterSlug;link.onclick=()=>showCitoFighter(org,f.fighterSlug,name,e);matchup.append(link);});
  if(!fs.length)matchup.append(el("span","","Matchup TBC"));row.append(matchup);
- row.append(el("small","note","Select a fighter to search available profiles."));
+ row.append(el("small","note","Select a fighter to open their promotion profile."));
  const cancelled=String(b.status).toLowerCase()==="cancelled"||String(b.status).toLowerCase()==="canceled";
  if(cancelled)row.append(el("p","note","Cancelled"));
  else{
@@ -360,6 +360,37 @@ function fighterPortrait(d){
  const img=el("img","");img.alt=d.name;img.decoding="async";img.loading="lazy";img.referrerPolicy="no-referrer";img.hidden=true;
  img.onload=()=>{placeholder.hidden=true;img.hidden=false;caption.replaceChildren(document.createTextNode("Photo: "+photo.artist+" · "));const license=safeURL(photo.license_url);if(license){const a=el("a","",photo.license);a.href=license;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}else caption.append(document.createTextNode(photo.license));const source=safeURL(photo.source_page);if(source){const a=el("a",""," · Source");a.href=source;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}};
  img.onerror=()=>{img.remove();placeholder.hidden=false;caption.textContent="Photograph unavailable";};frame.append(img);img.src=safeURL(photo.url);return figure;
+}
+async function showCitoFighter(org,slug,name,e){
+ fighterProfileOpen=true;
+ const token=++detailToken;view.replaceChildren();
+ const back=el("button","btn","← Back to fight card");back.onclick=()=>showEvent(e);view.append(back);
+ const wrap=el("div","eventdetail");view.append(wrap);wrap.append(el("h2","",name),el("p","note","Loading fighter profile…"));view.scrollIntoView({block:"start"});
+ try{
+ const res=await fetch(eventURL+"cito/"+encodeURIComponent(org)+"/fighters/"+encodeURIComponent(slug));
+ if(!res.ok)throw Error("Unavailable");const p=await res.json(),d=p.data;
+ if(p.success!==true||!d||!d.name)throw Error("Invalid profile");
+ if(token!==detailToken)return;
+ wrap.replaceChildren(el("h2","",d.name),el("p","note",[d.nickname,org.toUpperCase()].filter(Boolean).join(" · ")));
+ const facts=el("div","cards");
+ const add=(label,value)=>{if(value==null||value==="")return;const c=el("article","card");c.append(el("p","",label),el("b","",String(value)));facts.append(c);};
+ add("Height",d.heightIn!=null?Math.floor(d.heightIn/12)+" ft "+d.heightIn%12+" in":null);add("Reach",d.reachIn!=null?d.reachIn+" in":null);add("Stance",d.stance);add("Date of birth",d.dateOfBirth);add("Fighting out of",typeof d.fightingOutOf==="string"?d.fightingOutOf:null);
+ const rec=d.recordByPromotion?.[org]||d.record;
+ if(rec)add("Promotion archive record",rec.text||[rec.wins,rec.losses,rec.draws].join("–"));
+ wrap.append(facts,el("p","note",d.recordNote||"Promotion archive record; not necessarily the full career record."));
+ wrap.append(el("h3","","Recent fights"));
+ const fights=Array.isArray(d.recentFights)?d.recentFights.filter(Boolean):[];
+ if(!fights.length)wrap.append(el("p","note","No recent fights supplied."));
+ for(const b of fights){
+ const fs=Array.isArray(b.fighters)?b.fighters.filter(Boolean):[];
+ const self=fs.find(x=>x.fighterSlug===d.slug);const opp=fs.find(x=>x.fighterSlug&&x.fighterSlug!==d.slug);
+ const outcome=b.winnerFighterSlug?(b.winnerFighterSlug===d.slug?"WIN":"LOSS"):self?.outcome?String(self.outcome).toUpperCase():null;
+ const row=el("article","fightrow");const meta=el("div","fightmeta",[outcome,b.weightClass,b.titleFight?"TITLE FIGHT":null].filter(Boolean).join(" · "));if(outcome==="WIN")meta.style.color="var(--green)";if(outcome==="LOSS")meta.style.color="#ef9999";row.append(meta);
+ if(opp?.fighterSlug){const link=el("button","eventlink","vs "+(opp.fighterName||"Opponent"));link.onclick=()=>showCitoFighter(org,opp.fighterSlug,opp.fighterName||"Fighter",e);row.append(link);}else row.append(el("strong","","Opponent not supplied"));
+ row.append(el("p","note",[b.date,b.eventName].filter(Boolean).join(" · ")));const details=[b.method,b.resultRound!=null?"Round "+b.resultRound:null,b.resultTime].filter(Boolean).join(" · ");if(details)row.append(el("p","",details));wrap.append(row);
+ }
+ wrap.append(el("p","note","Source: Cito · Detailed statistics and portraits may not be available."));
+ }catch(err){if(token!==detailToken)return;wrap.replaceChildren(el("h2","",name),el("p","note","Promotion profile unavailable. This fighter may not be covered by the provider."));const retry=el("button","btn","Retry");retry.onclick=()=>showCitoFighter(org,slug,name,e);wrap.append(retry);}
 }
 async function showFighter(f,e){
  fighterProfileOpen=true;
