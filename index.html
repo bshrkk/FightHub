@@ -26,7 +26,8 @@
 @media(max-width:600px){.nav{position:sticky;top:65px;z-index:4;background:var(--bg);margin:0 -14px;padding:10px 14px;border-bottom:1px solid var(--line)}.nav button{padding:9px 13px;font-size:12px}.hero h1{font-size:clamp(60px,17vw,92px)}.hero p:not(.tagline){font-size:12px}.hero .tagline{font-size:12px}.item{padding:12px;gap:8px}.item>div:last-child{display:flex;flex-direction:column;gap:5px}.eventlink{font-size:15px}.tools{margin-top:12px}.fightrow{padding:13px}.heading .pill{font-size:9px}}
 .featured{margin:14px 0 0;padding:16px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(120deg,#252019,var(--panel));display:grid;gap:9px}.featured[hidden]{display:none}.featured .eyebrow{letter-spacing:1.5px}.featured h2{margin:0;font-family:"Barlow Condensed",Impact,sans-serif;font-size:28px;line-height:1.1}.featured .note{margin:0}.countdown{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.countdown div{background:var(--bg);border-radius:9px;text-align:center;padding:9px 3px}.countdown b{display:block;font-size:23px;font-variant-numeric:tabular-nums}.countdown small{color:var(--muted);font-size:10px;text-transform:uppercase}.featured .btn{justify-self:start}.spotlights h3{font-family:"Barlow Condensed",Impact,sans-serif;font-size:22px;margin:14px 0 8px}.spotlightrow{border-top:1px solid var(--line);padding:10px 0}.spotlightrow small{display:block;margin-top:4px}.spotlightfighters{display:grid;grid-template-columns:1fr 1fr;gap:12px}.spotlightfighters .eventlink{font-size:14px}.settingrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.settingrow input{accent-color:var(--gold);width:18px;height:18px}.fightrow select.field{margin-top:12px;width:100%}
 :root[data-theme="light"]{color-scheme:light;--bg:#f5f4f0;--panel:#fff;--panel2:#eeeae4;--line:#d5d0c7;--muted:#575c65;--text:#20232a;--gold:#b77932;--green:#197744}
-[data-theme="light"] .top{background:#f5f4f0ed}[data-theme="light"] .hero{background:radial-gradient(ellipse at 50% 0%,#f1d5b3,transparent 70%),#fff;border-color:var(--line)}[data-theme="light"] .hero .tagline,[data-theme="light"] .hero p{color:var(--text)}[data-theme="light"] .featured{background:linear-gradient(120deg,#f4e5d2,#fff)}[data-theme="light"] .empty,[data-theme="light"] .portraitframe{background:var(--panel2);border-color:var(--line)}[data-theme="light"] .sportlist span{color:var(--text)}[data-theme="light"] .fighterportrait a{color:#85501b}[data-theme="light"] .remove{color:#a13232}[data-theme="light"] .foot{color:var(--muted)}.rankings{display:grid;gap:12px;margin-top:12px}.rankingrow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center}.ranknumber{font-size:20px;text-align:center;color:var(--muted)}.rankingrow.champion{border:1px solid var(--gold)}.champion .ranknumber{color:var(--gold)}.rankmovement{font-size:12px;color:var(--muted)}</style></head>
+[data-theme="light"] .top{background:#f5f4f0ed}[data-theme="light"] .hero{background:radial-gradient(ellipse at 50% 0%,#f1d5b3,transparent 70%),#fff;border-color:var(--line)}[data-theme="light"] .hero .tagline,[data-theme="light"] .hero p{color:var(--text)}[data-theme="light"] .featured{background:linear-gradient(120deg,#f4e5d2,#fff)}[data-theme="light"] .empty,[data-theme="light"] .portraitframe{background:var(--panel2);border-color:var(--line)}[data-theme="light"] .sportlist span{color:var(--text)}[data-theme="light"] .fighterportrait a{color:#85501b}[data-theme="light"] .remove{color:#a13232}[data-theme="light"] .foot{color:var(--muted)}.rankings{display:grid;gap:12px;margin-top:12px}.rankingrow{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:10px;align-items:center}.ranknumber{font-size:20px;text-align:center;color:var(--muted)}.rankingrow.champion{border:1px solid var(--gold)}.champion .ranknumber{color:var(--gold)}.rankmovement{font-size:12px;color:var(--muted)}.cito-record-bar{display:flex;height:12px;border-radius:8px;overflow:hidden;margin:12px 0}.cito-form{display:flex;gap:8px;flex-wrap:wrap}.cito-chip{display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:36px;border:1px solid #555;border-radius:8px;font-weight:700}.cito-chip[data-outcome="W"]{color:#4ade80;border-color:#4ade80}.cito-chip[data-outcome="L"]{color:#ef9999;border-color:#ef9999}
+</style></head>
 <body>
 <header class="top"><div class="brand">FIGHT<span>HUB</span></div><div class="sub">The world of combat sports</div></header>
 <main class="shell">
@@ -362,6 +363,28 @@ function fighterPortrait(d){
  img.onload=()=>{placeholder.hidden=true;img.hidden=false;caption.replaceChildren(document.createTextNode("Photo: "+photo.artist+" · "));const license=safeURL(photo.license_url);if(license){const a=el("a","",photo.license);a.href=license;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}else caption.append(document.createTextNode(photo.license));const source=safeURL(photo.source_page);if(source){const a=el("a",""," · Source");a.href=source;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}};
  img.onerror=()=>{img.remove();placeholder.hidden=false;caption.textContent="Photograph unavailable";};frame.append(img);img.src=safeURL(photo.url);return figure;
 }
+function citoOutcome(b,d){
+ if(b?.status!=="completed")return "?";
+ const result=String(b.result||"").toLowerCase();
+ if(/no.contest|^nc$/.test(result))return "NC";
+ if(/draw/.test(result))return "D";
+ if(b.winnerFighterSlug)return b.winnerFighterSlug===d.slug?"W":"L";
+ const own=String(b.fighters?.find(f=>f.fighterSlug===d.slug)?.outcome||"").toLowerCase();
+ return ({win:"W",loss:"L",draw:"D",w:"W",l:"L",nc:"NC"})[own]||"?";
+}
+function citoRecent(d){return (Array.isArray(d?.recentFights)?d.recentFights:[]).filter(b=>b?.status==="completed").slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));}
+function citoVisual(d,org){
+ const section=el("section","");const rec=d.recordByPromotion?.[org]||d.record;
+ if(rec&&[rec.wins,rec.losses,rec.draws].every(n=>Number.isInteger(n)&&n>=0)){
+ const total=rec.wins+rec.losses+rec.draws;
+ if(total>0){section.append(el("h3","","Archive win rate"),el("strong","",Math.round(100*rec.wins/total)+"%"));
+ const bar=el("div","cito-record-bar");bar.setAttribute("aria-label",rec.wins+" wins, "+rec.losses+" losses, "+rec.draws+" draws");
+ for(const [n,color] of [[rec.wins,"#4ade80"],[rec.losses,"#ef9999"],[rec.draws,"#a1a1aa"]]){if(n){const part=el("span","");part.style.flex=String(n);part.style.background=color;bar.append(part);}}
+ section.append(bar,el("p","note",rec.wins+" wins · "+rec.losses+" losses · "+rec.draws+" draws · No contests excluded from percentage."));}}
+ const recent=citoRecent(d).slice(0,5);
+ if(recent.length){section.append(el("h3","","Recent form"));const row=el("div","cito-form");for(const b of recent){const o=citoOutcome(b,d);const chip=el("span","cito-chip",o);chip.dataset.outcome=o;chip.title=[b.date,b.eventName].filter(Boolean).join(" · ");row.append(chip);}section.append(row,el("p","note","Newest first · W win · L loss · D draw · NC no contest · ? unknown"));}
+ return section;
+}
 async function showCitoComparison(org,fs,e){
  const token=++detailToken;view.replaceChildren();const back=el("button","btn","← Back to fight card");back.onclick=()=>showEvent(e);view.append(back);
  const wrap=el("div","eventdetail");view.append(wrap);wrap.append(el("h2","","Fighter comparison"),el("p","note","Loading promotion profiles…"));
@@ -372,8 +395,8 @@ async function showCitoComparison(org,fs,e){
  const recs=ds.map(d=>d?.recordByPromotion?.[org]||d?.record);
  add("Archive record",recs.map(r=>r?.text));add("Height",ds.map(d=>d?.heightIn!=null?d.heightIn+" in":null));add("Reach",ds.map(d=>d?.reachIn!=null?d.reachIn+" in":null));add("Stance",ds.map(d=>d?.stance));add("Date of birth",ds.map(d=>d?.dateOfBirth));
  add("Archive win rate",recs.map(r=>r&&Number.isFinite(r.wins)&&Number.isFinite(r.losses)&&Number.isFinite(r.draws)&&r.wins+r.losses+r.draws>0?Math.round(100*r.wins/(r.wins+r.losses+r.draws))+"%":null));
- add("Recent form",ds.map(d=>{if(!d||!Array.isArray(d.recentFights))return null;return d.recentFights.filter(b=>b?.status==="completed").slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,5).map(b=>b.winnerFighterSlug?b.winnerFighterSlug===d.slug?"W":"L":/draw/i.test(b.result||"")?"D":/no.contest/i.test(b.result||"")?"NC":"?").join(" · ");}));
- wrap.append(table,el("p","note","Win rate excludes no contests. Recent form is newest first. Records cover the provider archive, not necessarily full careers. A dash means unavailable; ? means unknown result."));
+ add("Recent form",ds.map(d=>d?citoRecent(d).slice(0,5).map(b=>citoOutcome(b,d)).join(" · "):null));
+ const portraits=el("div","cards");ds.forEach((d,i)=>portraits.append(fighterPortrait(d?{...d,slug:"cito:"+org+":"+d.slug}:{name:fs[i]?.fighterName||"Fighter"})));wrap.append(portraits,table,el("p","note","Win rate excludes no contests. Recent form is newest first. Records cover the provider archive, not necessarily full careers. A dash means unavailable; ? means unknown result."));
  if(ds.some(d=>!d))wrap.append(el("p","note","One or more profiles could not be retrieved. No missing values have been estimated."));
  wrap.append(el("p","note","Source: Cito. No prediction is inferred from incomplete statistics."));
 }
@@ -388,19 +411,20 @@ async function showCitoFighter(org,slug,name,e){
  if(p.success!==true||!d||!d.name)throw Error("Invalid profile");
  if(token!==detailToken)return;
  wrap.replaceChildren(el("h2","",d.name),el("p","note",[d.nickname,org.toUpperCase()].filter(Boolean).join(" · ")));
+ wrap.prepend(fighterPortrait({...d,slug:"cito:"+org+":"+d.slug}));
  const facts=el("div","cards");
  const add=(label,value)=>{if(value==null||value==="")return;const c=el("article","card");c.append(el("p","",label),el("b","",String(value)));facts.append(c);};
  add("Height",d.heightIn!=null?Math.floor(d.heightIn/12)+" ft "+d.heightIn%12+" in":null);add("Reach",d.reachIn!=null?d.reachIn+" in":null);add("Stance",d.stance);add("Date of birth",d.dateOfBirth);add("Fighting out of",typeof d.fightingOutOf==="string"?d.fightingOutOf:null);
  const rec=d.recordByPromotion?.[org]||d.record;
  if(rec)add("Promotion archive record",rec.text||[rec.wins,rec.losses,rec.draws].join("–"));
  wrap.append(facts,el("p","note",d.recordNote||"Promotion archive record; not necessarily the full career record."));
- wrap.append(el("h3","","Recent fights"));
- const fights=Array.isArray(d.recentFights)?d.recentFights.filter(Boolean):[];
+ wrap.append(citoVisual(d,org),el("h3","","Recent fights"));
+ const fights=citoRecent(d);
  if(!fights.length)wrap.append(el("p","note","No recent fights supplied."));
  for(const b of fights){
  const fs=Array.isArray(b.fighters)?b.fighters.filter(Boolean):[];
  const self=fs.find(x=>x.fighterSlug===d.slug);const opp=fs.find(x=>x.fighterSlug&&x.fighterSlug!==d.slug);
- const outcome=b.winnerFighterSlug?(b.winnerFighterSlug===d.slug?"WIN":"LOSS"):self?.outcome?String(self.outcome).toUpperCase():null;
+ const outcome=({W:"WIN",L:"LOSS",D:"DRAW",NC:"NO CONTEST","?":"UNKNOWN"})[citoOutcome(b,d)];
  const row=el("article","fightrow");const meta=el("div","fightmeta",[outcome,b.weightClass,b.titleFight?"TITLE FIGHT":null].filter(Boolean).join(" · "));if(outcome==="WIN")meta.style.color="var(--green)";if(outcome==="LOSS")meta.style.color="#ef9999";row.append(meta);
  if(opp?.fighterSlug){const link=el("button","eventlink","vs "+(opp.fighterName||"Opponent"));link.onclick=()=>showCitoFighter(org,opp.fighterSlug,opp.fighterName||"Fighter",e);row.append(link);}else row.append(el("strong","","Opponent not supplied"));
  row.append(el("p","note",[b.date,b.eventName].filter(Boolean).join(" · ")));const details=[b.method,b.resultRound!=null?"Round "+b.resultRound:null,b.resultTime].filter(Boolean).join(" · ");if(details)row.append(el("p","",details));wrap.append(row);
