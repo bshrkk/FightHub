@@ -127,17 +127,34 @@ if(dedicatedOrg){
  const loading=el("p","note","Loading dedicated "+p.name+" feeds…");view.append(loading);
  feeds=await Promise.all(["upcoming","completed"].map(async status=>{
  const title=status==="completed"?"Recent results":"Upcoming events";
- try{const res=await fetch(eventURL+"events?org="+encodeURIComponent(dedicatedOrg)+"&status="+status);if(!res.ok)throw Error("Unavailable");const payload=await res.json();if(!Array.isArray(payload.data))throw Error("Invalid feed");const rows=payload.data.filter(e=>e.org===dedicatedOrg&&e.slug&&e.title&&(status!=="completed"||e.status==="completed"));return [title,rows,"ready"];}catch{return [title,[], "error"];}
+ try{const res=await cachedEventFetch(eventURL+"events?org="+encodeURIComponent(dedicatedOrg)+"&status="+status);if(!res.ok)throw Error("Unavailable");const payload=await res.json();if(!Array.isArray(payload.data))throw Error("Invalid feed");const rows=payload.data.filter(e=>e.org===dedicatedOrg&&e.slug&&e.title&&(status!=="completed"||e.status==="completed"));return [title,rows,"ready"];}catch{const fallback=(status==="completed"?results:events).filter(e=>e.org===dedicatedOrg);return [title,fallback,fallback.length?"partial":"error"];}
  }));
  if(token!==detailToken||!loading.isConnected)return;loading.remove();
 }
 for(const [title,items,state] of feeds){
-view.append(el("h3","",title));const matches=items.filter(e=>keys.includes(norm(e.org)));
+view.append(el("h3","",title));if(state==="partial")view.append(el("p","note","Dedicated feed unavailable. Showing matching events from the loaded general feed only."));const matches=items.filter(e=>keys.includes(norm(e.org)));
 if(!matches.length)view.append(el("p","note",state==="ready"?"No matching events in the currently loaded feed.":"Feed not available yet."));
 for(const e of matches){const row=el("div","item"),info=el("div","");const link=el("button","eventlink",e.title);link.onclick=()=>{page=title==="Recent results"?"results":"events";document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===page));showEvent({...e,returnPromotion:p});};info.append(link,el("small","",(title==="Recent results"?"Date: ":"Starts: ")+eventTime(e)));row.append(info);view.append(row);}
 }
 view.append(el("p","note",dedicatedOrg?"Source: MMA Calendar · Dedicated "+p.name+" feed · Up to 25 events per list.":"Sources: MMA Calendar and Cito. Loaded events only; directory inclusion does not guarantee coverage."));
 const follow=el("button","btn","☆ Follow promotion");follow.onclick=()=>{if(!saved.some(x=>x.name===p.name&&x.type==="Promotion")){saved.push({name:p.name,type:"Promotion",category:p.sport});persist();}follow.textContent="★ Following";};view.append(follow);
+}
+// Browser-side cache for event feeds and cards; never stores credentials.
+const eventFeedPending=new Map();
+async function cachedEventFetch(url){
+ const key="fh-event-v1:"+url;
+ let old=null;try{old=JSON.parse(localStorage.getItem(key)||"null");}catch{}
+ const ttl=url.includes("status=completed")?86400000:21600000;
+ const reply=(entry,stale=false)=>new Response(entry.body,{headers:{"Content-Type":"application/json","X-FightHub-Stale":stale?"yes":"no"}});
+ if(old&&Date.now()-old.time<ttl)return reply(old);
+ if(!eventFeedPending.has(url)){
+ const task=(async()=>{try{const r=await fetch(url);if(!r.ok)return {error:r};const body=await r.text();const p=JSON.parse(body);if(!p.data||p.success===false)return {error:new Response(body,{status:502})};const entry={body,time:Date.now()};try{localStorage.setItem(key,JSON.stringify(entry));}catch{}return {entry};}catch(e){return {error:new Response("",{status:503})};}})();
+ eventFeedPending.set(url,task);task.finally(()=>eventFeedPending.delete(url));
+ }
+ const result=await eventFeedPending.get(url);
+ if(result.entry)return reply(result.entry);
+ // Do not silently present expired schedules as current.
+ return result.error.clone();
 }
 const eventURL="https://sweet-forest-a1c4.bensharkey4.workers.dev/";
 let events=[], eventState="loading", results=[], resultState="loading", oneState="loading";
@@ -182,7 +199,7 @@ function renderFeatured(){
  const upcoming=events.filter(x=>x.slug&&Date.parse(x.starts_at)>Date.now()&&x.slug!==e.slug).sort((a,b)=>Date.parse(a.starts_at)-Date.parse(b.starts_at)).slice(0,3);
  if(preferences.highlights&&upcoming.length){highlights.append(el("h3","","Coming up next"));for(const x of upcoming){const row=el("div","spotlightrow");const link=el("button","eventlink",x.title);link.onclick=()=>showEvent(x);row.append(link,el("small","note",eventTime(x)));highlights.append(row);}}
  if(!preferences.spotlight)return;const fighterSection=el("div","");highlights.append(fighterSection);
- (async()=>{try{let d;try{d=await getEventDetail(e.slug);}catch(err){if(token!==detailToken||selectedEvent!==e)return;const message=err.httpStatus===429?"The data service returned HTTP 429 (request limit).":err.httpStatus?"The data service returned HTTP "+err.httpStatus+".":err.invalidData?"The data service returned an unexpected event response.":"The event data could not be downloaded. Check your connection and retry.";wrap.replaceChildren(el("h2","",e.title),el("p","note",eventTime(e)),emptyBlock("⚠️","Fight card unavailable",message));const retry=el("button","btn","Retry");retry.onclick=()=>showEvent(e);wrap.append(retry);return;}if(!Array.isArray(d.card))return;if(!fighterSection.isConnected||box.hidden)return;const bout=d.card.find(x=>x?.is_main&&x.fighter_a?.slug&&x.fighter_b?.slug);if(!bout)return;fighterSection.append(el("h3","","Main event fighter spotlight"));const grid=el("div","spotlightfighters");for(const f of [bout.fighter_a,bout.fighter_b]){const card=el("div","compareportrait");const portrait=el("div","");portrait.append(fighterPortrait(fighterCache.get(f.slug)||f));card.append(portrait);const link=el("button","eventlink",f.name||"Fighter");link.onclick=()=>{box.hidden=true;clearInterval(featuredTimer);showFighter(f,e);};card.append(link);grid.append(card);if(!fighterCache.has(f.slug))loadCardPortrait(f,portrait);}fighterSection.append(grid);}catch{}})();
+ (async()=>{try{let d;try{d=await getEventDetail(e.slug);}catch(err){if(token!==detailToken||selectedEvent!==e)return;const message=err.httpStatus===429?"The data service returned HTTP 429 (request limit).":err.httpStatus?"The data service returned HTTP "+err.httpStatus+".":err.invalidData?"The data service returned an unexpected event response.":"The event data could not be downloaded. Check your connection and retry.";wrap.replaceChildren(el("h2","",e.title),el("p","note",eventTime(e)),emptyBlock("⚠️","Fight card unavailable",message));const retry=el("button","btn","Retry");retry.onclick=()=>showEvent(e);wrap.append(retry);return;}if(!Array.isArray(d.card))return;if(!fighterSection.isConnected||box.hidden)return;const bout=d.card.find(x=>x?.is_main&&x.fighter_a?.slug&&x.fighter_b?.slug);if(!bout)return;fighterSection.append(el("h3","","Main event fighter spotlight"));const grid=el("div","spotlightfighters");for(const f of [bout.fighter_a,bout.fighter_b]){const card=el("div","compareportrait");const portrait=el("div","");portrait.append(fighterPortrait(fighterCache.get(f.slug)||f));card.append(portrait);const link=el("button","eventlink",f.name||"Fighter");link.onclick=()=>{box.hidden=true;clearInterval(featuredTimer);showFighter(f,e);};card.append(link);grid.append(card);if(fighterCache.has(f.slug))loadCardPortrait(f,portrait);}fighterSection.append(grid);}catch{}})();
 
 }
 function globalEventState(){return events.length?"ready":eventState;} function globalEvents(){return events;}
@@ -199,14 +216,14 @@ async function loadCitoResults(){
  if(results.length)resultState="ready";
  if((page==="results"||page==="promotions"||page==="home")&&!selectedEvent)render();
 }
-async function loadResults(){try{const response=await fetch(eventURL+"events?status=completed");if(!response.ok)throw Error("Unavailable");const payload=await response.json();if(!Array.isArray(payload.data)||payload.data.some(e=>e.status!=="completed"))throw Error("Invalid completed feed");results=payload.data.filter(e=>e&&typeof e.title==="string").sort((a,b)=>new Date(b.starts_at)-new Date(a.starts_at));cursors.results=nextCursor(payload,null);resultState="ready";}catch(e){resultState="error";}if(page==="results"&&!selectedEvent)render();}
-async function loadEvents(){try{const response=await fetch(eventURL+"events");if(!response.ok)throw Error("Feed unavailable");const payload=await response.json();if(!Array.isArray(payload.data))throw Error("Invalid feed");events=mergeRows(events,payload.data.filter(e=>e&&typeof e.title==="string")).sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));cursors.events=nextCursor(payload,null);eventState="ready";}catch(e){eventState="error";}if(page==="events"&&!selectedEvent)render();}
+async function loadResults(){try{const response=await cachedEventFetch(eventURL+"events?status=completed");if(!response.ok)throw Error("Unavailable");const payload=await response.json();if(!Array.isArray(payload.data)||payload.data.some(e=>e.status!=="completed"))throw Error("Invalid completed feed");results=payload.data.filter(e=>e&&typeof e.title==="string").sort((a,b)=>new Date(b.starts_at)-new Date(a.starts_at));cursors.results=nextCursor(payload,null);resultState="ready";}catch(e){resultState="error";}if(page==="results"&&!selectedEvent)render();}
+async function loadEvents(){try{const response=await cachedEventFetch(eventURL+"events");if(!response.ok)throw Error("Feed unavailable");const payload=await response.json();if(!Array.isArray(payload.data))throw Error("Invalid feed");events=mergeRows(events,payload.data.filter(e=>e&&typeof e.title==="string")).sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));cursors.events=nextCursor(payload,null);eventState="ready";}catch(e){eventState="error";}if(page==="events"&&!selectedEvent)render();}
 
 
 let selectedEvent=null, detailToken=0;
 const detailCache=new Map();
 const eventRequests=new Map();
-async function getEventDetail(slug){if(detailCache.has(slug))return detailCache.get(slug);if(!eventRequests.has(slug)){const task=(async()=>{const res=await fetch(eventURL+"events/"+encodeURIComponent(slug));if(!res.ok){const error=new Error("Fight data request failed");error.httpStatus=res.status;throw error;}const d=(await res.json()).data;if(!d||typeof d!=="object"||Array.isArray(d)){const error=new Error("Invalid event response");error.invalidData=true;throw error;}detailCache.set(slug,d);return d;})();eventRequests.set(slug,task);task.then(()=>eventRequests.delete(slug),()=>eventRequests.delete(slug));}return eventRequests.get(slug);}
+async function getEventDetail(slug){if(detailCache.has(slug))return detailCache.get(slug);if(!eventRequests.has(slug)){const task=(async()=>{const res=await cachedEventFetch(eventURL+"events/"+encodeURIComponent(slug));if(!res.ok){const error=new Error("Fight data request failed");error.httpStatus=res.status;throw error;}const d=(await res.json()).data;if(!d||typeof d!=="object"||Array.isArray(d)){const error=new Error("Invalid event response");error.invalidData=true;throw error;}detailCache.set(slug,d);return d;})();eventRequests.set(slug,task);task.then(()=>eventRequests.delete(slug),()=>eventRequests.delete(slug));}return eventRequests.get(slug);}
 async function showEvent(e){
  document.querySelector("#featured").hidden=true;clearInterval(featuredTimer);
  selectedEvent=e;const token=++detailToken;
@@ -358,6 +375,8 @@ function observeCardPortrait(f,container){if(!portraitObserver){loadCardPortrait
 const cardPortraitRequests=new Map();
 let cardPortraitQueue=Promise.resolve();
 function loadCardPortrait(f,container){
+ // Avoid automatic profile requests just to obtain a photograph.
+ if(!fighterCache.has(f.slug))return;
  const slug=f.slug;
  if(!cardPortraitRequests.has(slug)){
  const task=cardPortraitQueue.then(async()=>{if(fighterCache.has(slug))return fighterCache.get(slug);const res=await fetch(eventURL+"fighters/"+encodeURIComponent(slug));if(!res.ok)throw Error("Unavailable");const d=(await res.json()).data;if(!d?.name)throw Error("Invalid profile");fighterCache.set(slug,d);return d;});
