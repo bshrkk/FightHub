@@ -373,6 +373,43 @@ function citoOutcome(b,d){
  return ({win:"W",loss:"L",draw:"D",w:"W",l:"L",nc:"NC"})[own]||"?";
 }
 function citoRecent(d){return (Array.isArray(d?.recentFights)?d.recentFights:[]).filter(b=>b?.status==="completed").slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));}
+function citoIntel(d,org){
+ if(!d)return null;
+ const seen=new Set();const fights=citoRecent(d).filter(b=>b.promotion===org&&(!b.id||(!seen.has(b.id)&&seen.add(b.id))));
+ const wins=fights.filter(b=>citoOutcome(b,d)==="W");
+ const methods={ko:0,sub:0,dec:0,other:0};
+ for(const b of wins){const m=String(b.method||"").toLowerCase();if(/submission|choke|armbar|heel hook/.test(m))methods.sub++;else if(/decision/.test(m))methods.dec++;else if(/knockout|\btko\b|\bko\b/.test(m))methods.ko++;else methods.other++;}
+ let streak=0;for(const b of fights){if(citoOutcome(b,d)!=="W")break;streak++;}
+ const recent=fights.slice(0,5);const known=methods.ko+methods.sub+methods.dec;
+ return {fights,wins,methods,streak,recent,known,rate:known?Math.round(100*(methods.ko+methods.sub)/known):null};
+}
+function citoIntelPanel(d,org){
+ const a=citoIntel(d,org),section=el("section","");
+ section.append(el("h3","","Fight Intelligence"));
+ if(!a.fights.length){section.append(el("p","note","Not enough completed promotion fights for analysis."));return section;}
+ section.append(el("p","note",a.fights.length+" recent completed promotion bouts supplied · Not a full career or discipline-specific sample."));
+ const cards=el("div","cards");
+ const add=(label,v)=>{const c=el("article","card");c.append(el("p","",label),el("b","",String(v)));cards.append(c);};
+ add("Recent wins",a.wins.length+" / "+a.fights.length);add("Consecutive wins in sample",a.streak===a.fights.length?a.streak+"+":a.streak);
+ add("KO/TKO wins",a.methods.ko);add("Submission wins",a.methods.sub);add("Decision wins",a.methods.dec);add("Other / unknown wins",a.methods.other);
+ if(a.rate!==null)add("Finish share of classified wins",a.rate+"%");
+ section.append(cards,el("p","note","Methods describe recorded outcomes, not fighting style or skill ratings. Mixed-discipline promotions may combine different rulesets."));
+ return section;
+}
+function citoMatchIntel(ds,org){
+ const section=el("section","");section.append(el("h3","","Matchup intelligence"));
+ if(ds.length!==2||ds.some(d=>!d)){section.append(el("p","note","Both profiles are required for comparison."));return section;}
+ const [a,b]=ds;const stats=ds.map(d=>citoIntel(d,org));
+ const notes=[];
+ for(const [key,label] of [["heightIn","Height"],["reachIn","Reach"]]){if(ds.every(d=>Number.isFinite(d[key])&&d[key]>0)){const diff=a[key]-b[key];notes.push(diff?label+": "+(diff>0?a.name:b.name)+" has a "+Math.abs(diff)+" in advantage.":label+": equal listed measurements.");}}
+ const totals=ds.map(d=>{const r=d.recordByPromotion?.[org]||d.record;return r&&[r.wins,r.losses,r.draws].every(n=>Number.isInteger(n)&&n>=0)?r.wins+r.losses+r.draws:null;});
+ if(totals.every(n=>n!==null)&&totals[0]!==totals[1])notes.push((totals[0]>totals[1]?a.name:b.name)+" has more recorded wins, losses and draws in the promotion archive ("+totals.join(" vs ")+").");
+ stats.forEach((x,i)=>{if(x.known>=3){const m=x.methods;notes.push(ds[i].name+": "+m.ko+" KO/TKO, "+m.sub+" submission and "+m.dec+" decision wins in "+x.fights.length+" recent archived bouts. These are observed finishing routes, not a forecast.");}});
+ if(!notes.length)notes.push("Insufficient comparable data for meaningful matchup observations.");
+ for(const n of notes)section.append(el("p","",n));
+ section.append(el("p","note","No winner prediction: opponent quality, ruleset, current condition and detailed performance metrics are not established by this sample."));
+ return section;
+}
 function citoVisual(d,org){
  const section=el("section","");const rec=d.recordByPromotion?.[org]||d.record;
  if(rec&&[rec.wins,rec.losses,rec.draws].every(n=>Number.isInteger(n)&&n>=0)){
@@ -398,7 +435,7 @@ async function showCitoComparison(org,fs,e){
  add("Recent form",ds.map(d=>d?citoRecent(d).slice(0,5).map(b=>citoOutcome(b,d)).join(" · "):null));
  const portraits=el("div","cards");ds.forEach((d,i)=>portraits.append(fighterPortrait(d?{...d,slug:"cito:"+org+":"+d.slug}:{name:fs[i]?.fighterName||"Fighter"})));wrap.append(portraits,table,el("p","note","Win rate excludes no contests. Recent form is newest first. Records cover the provider archive, not necessarily full careers. A dash means unavailable; ? means unknown result."));
  if(ds.some(d=>!d))wrap.append(el("p","note","One or more profiles could not be retrieved. No missing values have been estimated."));
- wrap.append(el("p","note","Source: Cito. No prediction is inferred from incomplete statistics."));
+ wrap.append(citoMatchIntel(ds,org),el("p","note","Source: Cito. No prediction is inferred from incomplete statistics."));
 }
 async function showCitoFighter(org,slug,name,e){
  fighterProfileOpen=true;
@@ -418,7 +455,7 @@ async function showCitoFighter(org,slug,name,e){
  const rec=d.recordByPromotion?.[org]||d.record;
  if(rec)add("Promotion archive record",rec.text||[rec.wins,rec.losses,rec.draws].join("–"));
  wrap.append(facts,el("p","note",d.recordNote||"Promotion archive record; not necessarily the full career record."));
- wrap.append(citoVisual(d,org),el("h3","","Recent fights"));
+ wrap.append(citoVisual(d,org),citoIntelPanel(d,org),el("h3","","Recent fights"));
  const fights=citoRecent(d);
  if(!fights.length)wrap.append(el("p","note","No recent fights supplied."));
  for(const b of fights){
