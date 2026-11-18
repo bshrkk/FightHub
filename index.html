@@ -221,6 +221,7 @@ async function showEvent(e){
  fs.forEach((f,i)=>{if(i)matchup.append(el("span","","vs"));const name=f.fighterName||"TBC";const link=el("button","eventlink",name);link.disabled=!f.fighterSlug;link.onclick=()=>showCitoFighter(org,f.fighterSlug,name,e);matchup.append(link);});
  if(!fs.length)matchup.append(el("span","","Matchup TBC"));row.append(matchup);
  row.append(el("small","note","Select a fighter to open their promotion profile."));
+ if(fs.length===2&&fs.every(f=>f.fighterSlug)){const compare=el("button","btn","Compare fighters");compare.onclick=()=>showCitoComparison(org,fs,e);row.append(compare);}
  const cancelled=String(b.status).toLowerCase()==="cancelled"||String(b.status).toLowerCase()==="canceled";
  if(cancelled)row.append(el("p","note","Cancelled"));
  else{
@@ -360,6 +361,21 @@ function fighterPortrait(d){
  const img=el("img","");img.alt=d.name;img.decoding="async";img.loading="lazy";img.referrerPolicy="no-referrer";img.hidden=true;
  img.onload=()=>{placeholder.hidden=true;img.hidden=false;caption.replaceChildren(document.createTextNode("Photo: "+photo.artist+" · "));const license=safeURL(photo.license_url);if(license){const a=el("a","",photo.license);a.href=license;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}else caption.append(document.createTextNode(photo.license));const source=safeURL(photo.source_page);if(source){const a=el("a",""," · Source");a.href=source;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}};
  img.onerror=()=>{img.remove();placeholder.hidden=false;caption.textContent="Photograph unavailable";};frame.append(img);img.src=safeURL(photo.url);return figure;
+}
+async function showCitoComparison(org,fs,e){
+ const token=++detailToken;view.replaceChildren();const back=el("button","btn","← Back to fight card");back.onclick=()=>showEvent(e);view.append(back);
+ const wrap=el("div","eventdetail");view.append(wrap);wrap.append(el("h2","","Fighter comparison"),el("p","note","Loading promotion profiles…"));
+ const ds=await Promise.all(fs.map(async f=>{try{const res=await fetch(eventURL+"cito/"+encodeURIComponent(org)+"/fighters/"+encodeURIComponent(f.fighterSlug));if(!res.ok)return null;const p=await res.json();return p.success===true&&p.data?.name?p.data:null;}catch{return null;}}));
+ if(token!==detailToken)return;wrap.replaceChildren(el("h2","","Fighter comparison"),el("p","note",org.toUpperCase()+" · Promotion archive data"));
+ const table=el("div","");const header=el("div","comparerow comparehead");header.append(el("span","","Fighter"));fs.forEach((f,i)=>{const link=el("button","eventlink",ds[i]?.name||f.fighterName||"Fighter");link.onclick=()=>showCitoFighter(org,f.fighterSlug,f.fighterName,e);header.append(link);});table.append(header);
+ const add=(label,values)=>{const row=el("div","comparerow");row.append(el("span","",label),...values.map(v=>el("strong","",v==null||v===""?"—":String(v))));table.append(row);};
+ const recs=ds.map(d=>d?.recordByPromotion?.[org]||d?.record);
+ add("Archive record",recs.map(r=>r?.text));add("Height",ds.map(d=>d?.heightIn!=null?d.heightIn+" in":null));add("Reach",ds.map(d=>d?.reachIn!=null?d.reachIn+" in":null));add("Stance",ds.map(d=>d?.stance));add("Date of birth",ds.map(d=>d?.dateOfBirth));
+ add("Archive win rate",recs.map(r=>r&&Number.isFinite(r.wins)&&Number.isFinite(r.losses)&&Number.isFinite(r.draws)&&r.wins+r.losses+r.draws>0?Math.round(100*r.wins/(r.wins+r.losses+r.draws))+"%":null));
+ add("Recent form",ds.map(d=>{if(!d||!Array.isArray(d.recentFights))return null;return d.recentFights.filter(b=>b?.status==="completed").slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,5).map(b=>b.winnerFighterSlug?b.winnerFighterSlug===d.slug?"W":"L":/draw/i.test(b.result||"")?"D":/no.contest/i.test(b.result||"")?"NC":"?").join(" · ");}));
+ wrap.append(table,el("p","note","Win rate excludes no contests. Recent form is newest first. Records cover the provider archive, not necessarily full careers. A dash means unavailable; ? means unknown result."));
+ if(ds.some(d=>!d))wrap.append(el("p","note","One or more profiles could not be retrieved. No missing values have been estimated."));
+ wrap.append(el("p","note","Source: Cito. No prediction is inferred from incomplete statistics."));
 }
 async function showCitoFighter(org,slug,name,e){
  fighterProfileOpen=true;
