@@ -122,7 +122,7 @@ const keys=aliases[p.name]||[norm(p.name)];
 for(const [title,items,state] of [["Upcoming events",events,eventState],["Recent results",results,resultState]]){
 view.append(el("h3","",title));const matches=items.filter(e=>keys.includes(norm(e.org)));
 if(!matches.length)view.append(el("p","note",state==="ready"?"No matching events in the currently loaded feed.":"Feed not available yet."));
-for(const e of matches){const row=el("div","item"),info=el("div","");const link=el("button","eventlink",e.title);link.onclick=()=>{page=title==="Recent results"?"results":"events";document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===page));showEvent(e);};info.append(link,el("small","","Starts: "+eventTime(e)));row.append(info);view.append(row);}
+for(const e of matches){const row=el("div","item"),info=el("div","");const link=el("button","eventlink",e.title);link.onclick=()=>{page=title==="Recent results"?"results":"events";document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===page));showEvent(e);};info.append(link,el("small","",(isResults?"Date: ":"Starts: ")+eventTime(e)));row.append(info);view.append(row);}
 }
 view.append(el("p","note","Sources: MMA Calendar and Cito. Loaded events only; directory inclusion does not guarantee coverage."));
 const follow=el("button","btn","☆ Follow promotion");follow.onclick=()=>{if(!saved.some(x=>x.name===p.name&&x.type==="Promotion")){saved.push({name:p.name,type:"Promotion",category:p.sport});persist();}follow.textContent="★ Following";};view.append(follow);
@@ -149,7 +149,7 @@ const matches=events.filter(e=>(!selected||sportNames[e.sport]===selected)&&(!q|
 view.append(el("p","note",matches.length+" events · UK local times · MMA Calendar + Cito · Loaded so far"+(isResults?".":"; schedules subject to change.")));
 if(!matches.length)view.append(emptyBlock("🔎","No matching events","Try another search or sport filter."));
 const list=el("div","resultlist");
-matches.forEach(e=>{const row=el("div","item"),info=el("div","");const open=el("button","eventlink",e.title);open.type="button";open.disabled=!e.slug;open.addEventListener("click",()=>showEvent(e));info.append(open,el("small","",(e.org||"").toUpperCase()+" · "+(sportNames[e.sport]||e.sport||"Combat sports")),el("small","","Starts: "+eventTime(e)));if(e.main_card_at)info.append(el("small","","Main card: "+ukTime(e.main_card_at)));const save=el("button","btn","☆ Save");save.addEventListener("click",()=>addSave(e.title,"Event",sportNames[e.sport]||e.sport));const actions=el("div","");actions.append(save);if(!isResults&&!e.dateOnly&&Date.parse(e.starts_at)>Date.now()){const remind=el("button","btn","Calendar");remind.onclick=()=>downloadReminder(e);actions.append(remind);}row.append(info,actions);list.append(row);});view.append(list);if(!isResults&&oneState==="error")view.append(el("p","note","Additional feeds unavailable: "+citoFailures.join(", ")+""));moreButton(isResults?"results":"events");}
+matches.forEach(e=>{const row=el("div","item"),info=el("div","");const open=el("button","eventlink",e.title);open.type="button";open.disabled=!e.slug;open.addEventListener("click",()=>showEvent(e));info.append(open,el("small","",(e.org||"").toUpperCase()+" · "+(sportNames[e.sport]||e.sport||"Combat sports")),el("small","","Starts: "+eventTime(e)));if(e.main_card_at)info.append(el("small","","Main card: "+ukTime(e.main_card_at)));const save=el("button","btn","☆ Save");save.addEventListener("click",()=>addSave(e.title,"Event",sportNames[e.sport]||e.sport));const actions=el("div","");actions.append(save);if(!isResults&&!e.dateOnly&&Date.parse(e.starts_at)>Date.now()){const remind=el("button","btn","Calendar");remind.onclick=()=>downloadReminder(e);actions.append(remind);}row.append(info,actions);list.append(row);});view.append(list);if(!isResults&&oneState==="error")view.append(el("p","note","Additional feeds unavailable: "+citoFailures.join(", ")+""));if(isResults&&citoResultFailures.length)view.append(el("p","note","Additional results feeds unavailable: "+citoResultFailures.join(", ")));moreButton(isResults?"results":"events");}
 function downloadReminder(e){
 const start=new Date(e.starts_at);if(!Number.isFinite(start.getTime()))return;
 const stamp=d=>d.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
@@ -174,6 +174,19 @@ function renderFeatured(){
 
 }
 function globalEventState(){return events.length?"ready":eventState;} function globalEvents(){return events;}
+const citoResultFailures=[];
+async function loadCitoResults(){
+ await Promise.all(citoPromotions.map(async org=>{try{
+ const res=await fetch(eventURL+"cito/"+org+"/events/recent?limit=25");
+ if(!res.ok)throw Error("Unavailable");
+ const p=await res.json();if(p.success!==true||!Array.isArray(p.data))throw Error("Invalid feed");
+ const rows=p.data.filter(x=>x.status==="completed"&&x.slug&&x.name&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)).map(x=>({slug:"cito-"+org+"-"+x.slug,title:x.name,org,sport:org==="one"?"mixed-combat":"mma",starts_at:x.date+"T00:00:00Z",dateOnly:true,location:x.location||x.venue,boutCount:x.boutCount,source:"Cito",status:"completed"}));
+ const norm=x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,"");
+ results=mergeRows(results,rows.filter(x=>!results.some(y=>norm(y.title)===norm(x.title)))).sort((a,b)=>Date.parse(b.starts_at)-Date.parse(a.starts_at));
+ }catch(e){citoResultFailures.push(org);}}));
+ if(results.length)resultState="ready";
+ if((page==="results"||page==="promotions"||page==="home")&&!selectedEvent)render();
+}
 async function loadResults(){try{const response=await fetch(eventURL+"events?status=completed");if(!response.ok)throw Error("Unavailable");const payload=await response.json();if(!Array.isArray(payload.data)||payload.data.some(e=>e.status!=="completed"))throw Error("Invalid completed feed");results=payload.data.filter(e=>e&&typeof e.title==="string").sort((a,b)=>new Date(b.starts_at)-new Date(a.starts_at));cursors.results=nextCursor(payload,null);resultState="ready";}catch(e){resultState="error";}if(page==="results"&&!selectedEvent)render();}
 async function loadEvents(){try{const response=await fetch(eventURL+"events");if(!response.ok)throw Error("Feed unavailable");const payload=await response.json();if(!Array.isArray(payload.data))throw Error("Invalid feed");events=mergeRows(events,payload.data.filter(e=>e&&typeof e.title==="string")).sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));cursors.events=nextCursor(payload,null);eventState="ready";}catch(e){eventState="error";}if(page==="events"&&!selectedEvent)render();}
 
@@ -190,7 +203,7 @@ async function showEvent(e){
  const wrap=el("div","eventdetail");view.append(wrap);
  wrap.append(el("h2","",e.title),el("p","note","Loading fight card…"));
  view.scrollIntoView({block:"start"});
- if(e.source==="Cito"){wrap.replaceChildren(el("h2","",e.title),el("p","",e.location||"Venue TBC"),el("p","note",eventTime(e)),el("p","","Listed bouts: "+(e.boutCount??"Not supplied")),el("p","note","Source: Cito · Detailed fight card not connected yet."));return;}
+ if(e.source==="Cito"){wrap.replaceChildren(el("h2","",e.title),el("p","",e.location||"Venue TBC"),el("p","note",eventTime(e)),el("p","","Listed bouts: "+(e.boutCount??"Not supplied")),el("p","note",e.status==="completed"?"Source: Cito · Individual fight results not connected yet.":"Source: Cito · Detailed fight card not connected yet."));return;}
  try{
  let d=await getEventDetail(e.slug);
  if(token!==detailToken||selectedEvent!==e||!["events","results"].includes(page))return;
@@ -407,7 +420,7 @@ sport.addEventListener("change",()=>{if(page==="promotions"||page==="events"||pa
 document.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",()=>{search.value="";sport.value="";}));
 render();
 loadEvents().then(loadOneEvents);
-loadResults();
+loadResults().then(loadCitoResults);
 if("serviceWorker" in navigator && location.protocol.startsWith("http"))window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
 </script>
 </body></html>
