@@ -217,7 +217,10 @@ async function showEvent(e){
  const row=el("article","fightrow");
  row.append(el("div","fightmeta",[b.cardSegment,b.weightClass,b.titleFight?"TITLE FIGHT":null,b.status].filter(Boolean).join(" · ")));
  const fs=Array.isArray(b.fighters)?b.fighters.filter(Boolean):[];
- row.append(el("h3","",fs.map(f=>f.fighterName||"TBC").join(" vs ")||"Matchup TBC"));
+ const matchup=el("div","formrow");
+ fs.forEach((f,i)=>{if(i)matchup.append(el("span","","vs"));const name=f.fighterName||"TBC";const link=el("button","eventlink",name);link.disabled=!f.fighterName;link.onclick=()=>{page="fighters";search.value="";sport.value="";fighterQuery=name;fighterResults=[];fighterState="idle";render();const form=view.querySelector("form");if(form)form.requestSubmit();};matchup.append(link);});
+ if(!fs.length)matchup.append(el("span","","Matchup TBC"));row.append(matchup);
+ row.append(el("small","note","Select a fighter to search available profiles."));
  const cancelled=String(b.status).toLowerCase()==="cancelled"||String(b.status).toLowerCase()==="canceled";
  if(cancelled)row.append(el("p","note","Cancelled"));
  else{
