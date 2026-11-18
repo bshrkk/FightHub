@@ -165,6 +165,39 @@ async function showComparison(b,e){
  const recent=el("section","");wrap.append(el("h3","","Recent winning methods"),recent);
  histories.forEach((h,i)=>{const card=el("div","fightrow");card.append(el("strong","",fighters[i].name));const entries=h.status==="fulfilled"?h.value:[];const wins=entries.filter(x=>["win","w"].includes(String(x.result).toLowerCase()));const methods=wins.map(x=>String(x.method_normalized||x.method||"").toLowerCase());const ko=methods.filter(x=>/^(ko|tko|knockout|technical knockout)(\\b|_)/.test(x)).length;const sub=methods.filter(x=>/^submission(\\b|_)/.test(x)).length;card.append(el("p","note",entries.length? wins.length+" wins in "+entries.length+" available recent bouts":"Recent history unavailable"));if(wins.length){card.append(el("p","","KO/TKO: "+ko+" · Submission: "+sub));card.append(el("p","note","Counts of identified methods among recent wins, not career finish rates. Other or missing methods are not classified."));}recent.append(card);});
 
+
+ const intel=el("section","intel");wrap.append(intel);
+ intel.append(el("h3","","Fight Intelligence"),el("p","note","Rule-based matchup assessment · Not an AI model or calibrated prediction."));
+ const signals=[];
+ const number=v=>typeof v==="number"&&Number.isFinite(v)&&v>=0?v:null;
+ const compare=(label,values,threshold,unit,route,group)=>{if(values.some(v=>v==null))return;const diff=values[0]-values[1];if(Math.abs(diff)<threshold)return;signals.push({label,side:diff>0?0:1,diff:Math.abs(diff),unit,route,group});};
+ const upcoming=!b.result&&e.status!=="completed"&&Number.isFinite(Date.parse(e.starts_at))&&Date.parse(e.starts_at)>Date.now();
+ compare("Reach",both(d=>number(d.reach_inches)),2," in","Use distance management and long-range attacks if the matchup permits.","physical");
+ compare("Height",both(d=>number(d.height_inches)),2," in","Explore range and positioning advantages; height alone does not establish effectiveness.","physical");
+ const rates=recs.map(winRate);
+ compare("Career win rate",rates,10," percentage points","Build on demonstrated results, while accounting for the quality of opposition.","record");
+ const forms=histories.map(h=>h.status==="fulfilled"&&h.value.length===5&&h.value.every(x=>["win","w","loss","l","draw","d"].includes(String(x.result).toLowerCase()))?h.value.filter(x=>["win","w"].includes(String(x.result).toLowerCase())).length:null);
+ compare("Recent wins (five bouts)",forms,2," wins","Look to reproduce recent successful performances.","form");
+ const normalizedScope=x=>String(x||"").toLowerCase().replace(/_/g,"-");
+ const scopeOK=!!recordKey&&scope(ds[0])&&normalizedScope(scope(ds[0]))===normalizedScope(scope(ds[1]))&&[normalizedScope(recordKey),normalizedScope(b.sport)].includes(normalizedScope(scope(ds[0])))&&ds.every(d=>number(d?.stats?.basis?.bouts)>=3);
+ if(scopeOK){
+ compare("Striking accuracy",both(d=>parsePct(d.stats?.str_acc)),5," percentage points","Look for clean, efficient striking exchanges.","striking");
+ compare("Striking defence",both(d=>parsePct(d.stats?.str_def)),5," percentage points","Limit clean incoming strikes and counter when openings appear.","striking");
+ if(b.sport==="mma"){
+ compare("Takedown accuracy",both(d=>parsePct(d.stats?.td_acc)),10," percentage points","Explore takedown opportunities and positional control.","grappling");
+ compare("Takedown defence",both(d=>parsePct(d.stats?.td_def)),10," percentage points","Use takedown defence to keep the fight in preferred positions.","grappling");
+ }}
+ const evidence=el("div","fightrow");evidence.append(el("strong","","Measured differences"));
+ if(!signals.length)evidence.append(el("p","note","No sufficiently large comparable differences in the available data."));
+ signals.forEach(x=>evidence.append(el("p","",fighters[x.side].name+" · "+x.label+" advantage: "+Number(x.diff.toFixed(1))+x.unit)));intel.append(evidence);
+ if(upcoming){
+ fighters.forEach((f,i)=>{const card=el("div","fightrow");card.append(el("strong","","Possible route to victory: "+f.name));const own=signals.filter(x=>x.side===i);const routes=[...new Set(own.map(x=>x.route))];if(routes.length)routes.forEach(t=>card.append(el("p","",t)));else card.append(el("p","note","Insufficient comparative evidence to suggest a specific route."));intel.append(card);});
+ const votes=[0,0];for(const group of ["record","form","striking","grappling"]){const sides=new Set(signals.filter(x=>x.group===group).map(x=>x.side));if(sides.size===1)votes[[...sides][0]]++;}
+ const adequate=recs.every(r=>r&&[r.wins,r.losses,r.draws].every(validCount)&&r.wins+r.losses+r.draws>=5)&&forms.every(v=>v!==null)&&scopeOK;
+ const lean=adequate&&Math.max(...votes)>=2&&Math.abs(votes[0]-votes[1])>=2?(votes[0]>votes[1]?0:1):null;
+ const outlook=el("div","fightrow");outlook.append(el("strong","","Matchup outlook"),el("p","",lean===null?"No reliable directional lean from available evidence.":"Tentative statistical lean: "+fighters[lean].name),el("p","note","Evidence groups: "+fighters[0].name+" "+votes[0]+" · "+fighters[1].name+" "+votes[1]+". Equal-weight descriptive rules; not validated against fight outcomes. No win probability or betting recommendation."));intel.append(outlook);
+ }else intel.append(el("p","note","Pre-fight outlook is only shown for future scheduled bouts. Current records may include this fight."));
+ intel.append(el("p","note","Limitations: opponent quality, injuries, preparation, judging, styles and current condition are not measured here. Missing or conflicting evidence is not scored. Physical differences do not count toward the outlook."));
  wrap.append(el("p","note","Source: MMA Calendar. — means not supplied. Records may overlap across disciplines; recent form is limited to available matching professional fight entries. Statistics are descriptive, not predictions."));
  if(ds.some(d=>!d)){const retry=el("button","btn","Retry comparison");retry.onclick=()=>showComparison(b,e);wrap.append(retry);}
 }
