@@ -27,7 +27,7 @@
 <main class="shell">
 <section class="hero"><div class="eyebrow">ONE HUB. EVERY FIGHT.</div><h1>FIGHT<span>HUB</span></h1><p class="tagline">GET CLOSE TO THE ACTION</p><p>Every promotion. Every discipline. One place to follow the world of combat sports.</p></section>
 <nav class="nav" aria-label="Main sections">
-<button class="active" data-page="events">Events</button><button data-page="results">Results</button><button data-page="fighters">Fighters</button><button data-page="promotions">Promotions</button><button data-page="odds">Odds centre</button><button data-page="saved">Saved</button>
+<button class="active" data-page="events">Events</button><button data-page="results">Results</button><button data-page="fighters">Fighters</button><button data-page="promotions">Promotions</button><button data-page="odds">Odds centre</button><button data-page="rankings">Rankings</button><button data-page="saved">Saved</button>
 </nav>
 <div class="tools"><input id="search" type="search" placeholder="Search this section…" aria-label="Search this section"><select id="sport" aria-label="Filter sport"><option value="">All combat sports</option><option>MMA</option><option>Boxing</option><option>Kickboxing</option><option>Muay Thai</option><option>Bare-knuckle</option></select></div>
 <section id="view" aria-live="polite"></section>
@@ -68,6 +68,7 @@ promotionData.push(
 {name:"BYB Extreme",sport:"Bare-knuckle",kind:"Bare-knuckle promotion"}
 );
 const pages = {
+rankings:{title:"Fighter rankings"},
 events:{title:"Upcoming events",icon:"🗓️",headline:"Event listings are ready for verified data",body:"No live event schedule is connected yet. FightHub will only show dates, venues and bout cards when they can be checked against a reliable source."},
 results:{title:"Recent results",icon:"🏆",headline:"Results archive awaiting a verified feed",body:"Results will include winners, method, round and finish time. No results are fabricated for this early build."},
 fighters:{title:"Fighter directory",icon:"🥊",headline:"Fighter profiles awaiting verified records",body:"Profiles are planned to include records, nationality, weight class, last-five form and sourced performance statistics."},
@@ -317,9 +318,16 @@ function renderFighterSearch(){
  const list=el("div","resultlist");for(const f of fighterResults){const row=el("div","item"),info=el("div","");const link=el("button","eventlink",f.name);link.onclick=()=>showFighter(f,null);info.append(link,el("small","",[f.nickname,f.nationality].filter(Boolean).join(" · ")));row.append(info);list.append(row);}view.append(list);
 }
 let fighterProfileOpen=false;
-function render(){fighterProfileOpen=false;search.disabled=page==="fighters";sport.disabled=page==="fighters";selectedEvent=null;++detailToken;view.replaceChildren();const p=pages[page];const heading=el("div","heading");heading.append(el("h2","",p.title),el("span","pill",page==="events"?(eventState==="ready"?"EVENT FEED":eventState==="loading"?"LOADING":"UNAVAILABLE"):page==="results"?(resultState==="ready"?"RESULTS FEED":resultState==="loading"?"LOADING":"UNAVAILABLE"):page==="promotions"?"STARTER DIRECTORY":page==="fighters"?"FIGHTER SEARCH":"LIVE DATA NOT CONNECTED"));view.append(heading);
+function renderRankings(){
+ const sources=[{name:"UFC",url:"https://www.ufc.com/rankings",description:"Champions, weight divisions and pound-for-pound rankings"},{name:"PFL",url:"https://pflmma.com/rankings/",description:"Champions, divisional rankings and pound-for-pound rankings"}];
+ view.append(el("p","note","Official rankings directory. Open the promotion's published rankings for its latest positions. FightHub does not calculate or reproduce rankings yet."));
+ for(const p of sources){const card=el("article","fightrow");card.append(el("strong","",p.name),el("p","note",p.description));const link=el("a","btn","View official rankings ↗");link.href=p.url;link.target="_blank";link.rel="noopener noreferrer";link.style.display="inline-block";card.append(link);view.append(card);}
+ view.append(el("p","note","Other promotions will be added when reliable official ranking sources are available."));
+}
+function render(){fighterProfileOpen=false;search.disabled=page==="fighters";sport.disabled=page==="fighters";selectedEvent=null;++detailToken;view.replaceChildren();const p=pages[page];const heading=el("div","heading");heading.append(el("h2","",p.title),el("span","pill",page==="events"?(eventState==="ready"?"EVENT FEED":eventState==="loading"?"LOADING":"UNAVAILABLE"):page==="results"?(resultState==="ready"?"RESULTS FEED":resultState==="loading"?"LOADING":"UNAVAILABLE"):page==="promotions"?"STARTER DIRECTORY":page==="fighters"?"FIGHTER SEARCH":page==="rankings"?"OFFICIAL SOURCES":"LIVE DATA NOT CONNECTED"));view.append(heading);
 if(page==="events"||page==="results"){renderEvents();return;}
 if(page==="fighters"){renderFighterSearch();return;}
+if(page==="rankings"){renderRankings();return;}
 if(page==="saved"){renderSaved();return;}
 if(page==="promotions"){view.append(emptyBlock(p.icon,p.headline,p.body));renderPromotions();return;}
 view.append(emptyBlock(p.icon,p.headline,p.body));
