@@ -203,7 +203,35 @@ async function showEvent(e){
  const wrap=el("div","eventdetail");view.append(wrap);
  wrap.append(el("h2","",e.title),el("p","note","Loading fight card…"));
  view.scrollIntoView({block:"start"});
- if(e.source==="Cito"){wrap.replaceChildren(el("h2","",e.title),el("p","",e.location||"Venue TBC"),el("p","note",eventTime(e)),el("p","","Listed bouts: "+(e.boutCount??"Not supplied")),el("p","note",e.status==="completed"?"Source: Cito · Individual fight results not connected yet.":"Source: Cito · Detailed fight card not connected yet."));return;}
+ if(e.source==="Cito"){
+ const org=e.org,slug=e.slug.slice(("cito-"+org+"-").length);
+ try{
+ const res=await fetch(eventURL+"cito/"+encodeURIComponent(org)+"/events/"+encodeURIComponent(slug));
+ if(!res.ok)throw Error("Unavailable");const p=await res.json(),d=p.data;
+ if(p.success!==true||!d||!Array.isArray(d.card))throw Error("Invalid card");
+ if(token!==detailToken||selectedEvent!==e)return;
+ wrap.replaceChildren(el("h2","",d.name||e.title),el("p","",d.location||e.location||"Venue TBC"),el("p","note",eventTime(e)));
+ const bouts=d.card.filter(Boolean).sort((a,b)=>(a.boutOrder??999)-(b.boutOrder??999));
+ if(!bouts.length)wrap.append(el("p","note","No individual bouts supplied yet."));
+ for(const b of bouts){
+ const row=el("article","fightrow");
+ row.append(el("div","fightmeta",[b.cardSegment,b.weightClass,b.titleFight?"TITLE FIGHT":null,b.status].filter(Boolean).join(" · ")));
+ const fs=Array.isArray(b.fighters)?b.fighters.filter(Boolean):[];
+ row.append(el("h3","",fs.map(f=>f.fighterName||"TBC").join(" vs ")||"Matchup TBC"));
+ const cancelled=String(b.status).toLowerCase()==="cancelled"||String(b.status).toLowerCase()==="canceled";
+ if(cancelled)row.append(el("p","note","Cancelled"));
+ else{
+ const winner=fs.find(f=>b.winnerFighterSlug&&f.fighterSlug===b.winnerFighterSlug)||fs.find(f=>["win","winner","w"].includes(String(f.outcome).toLowerCase()));
+ if(winner)row.append(el("p","","Winner: "+winner.fighterName));
+ if(b.result||b.method||b.resultRound!=null||b.resultTime)row.append(el("p","note",[b.result,b.method,b.resultRound!=null?"Round "+b.resultRound:null,b.resultTime].filter(Boolean).join(" · ")));
+ else if(e.status==="completed")row.append(el("p","note","Individual result not supplied"));
+ }
+ wrap.append(row);
+ }
+ wrap.append(el("p","note","Source: Cito · Coverage may be incomplete; detailed statistics and non-MMA bouts may be unavailable."));
+ }catch(err){if(token===detailToken&&selectedEvent===e)wrap.replaceChildren(el("h2","",e.title),el("p","",e.location||"Venue TBC"),el("p","note","Fight card unavailable. Please try again later."));}
+ return;
+ }
  try{
  let d=await getEventDetail(e.slug);
  if(token!==detailToken||selectedEvent!==e||!["events","results"].includes(page))return;
