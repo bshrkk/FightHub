@@ -141,31 +141,48 @@ const follow=el("button","btn","☆ Follow promotion");follow.onclick=()=>{if(!s
 }
 // Browser-side cache for event feeds and cards; never stores credentials.
 const eventFeedPending=new Map();
+const feedStatus=new Map();
+function showDataStatus(){
+ let panel=document.getElementById("data-freshness");
+ if(!panel){panel=document.createElement("details");panel.id="data-freshness";panel.style.cssText="margin:12px auto;padding:12px;border:1px solid #303644;border-radius:12px;max-width:960px;color:var(--muted);font-size:12px";const v=document.querySelector("#view");if(!v)return;v.before(panel);}
+ const rows=[...feedStatus.values()];
+ const stale=rows.filter(x=>x.state==="STALE").length;
+ const errors=rows.filter(x=>x.state==="ERROR").length;
+ const unknown=rows.filter(x=>!x.updated&&x.state!=="ERROR").length;
+ const summary=document.createElement("summary");summary.textContent="Data status · "+(stale?stale+" older backup response(s)":errors?errors+" unavailable request(s)":unknown?"Some update times unknown":rows.length?"Cached / retrieved data":"Waiting for data");
+ const list=document.createElement("div");list.textContent="Session request history; not a guarantee that every displayed item is current.";
+ for(const x of rows.slice(-30).reverse()){const p=document.createElement("p");p.textContent=x.label+" · "+x.state+(x.updated?" · Provider retrieved "+new Date(x.updated).toLocaleString("en-GB"):" · Update time unknown");list.append(p);}
+ panel.replaceChildren(summary,list);
+}
+function noteData(url,r){
+ const u=new URL(url);const raw=r.headers.get("X-Data-Updated");const updated=raw&&Number.isFinite(Date.parse(raw))?raw:null;
+ feedStatus.set(url,{label:u.pathname+u.search,state:r.ok?(r.headers.get("X-Cache")||"UNKNOWN"):"ERROR",updated});showDataStatus();return r;
+}
+async function trackedFetch(url){try{return noteData(url,await fetch(url));}catch(e){noteData(url,new Response(null,{status:503}));throw e;}}
 async function cachedEventFetch(url){
- const key="fh-event-v1:"+url;
+ const key="fh-event-v2:"+url;
  let old=null;try{old=JSON.parse(localStorage.getItem(key)||"null");}catch{}
  const ttl=url.includes("status=completed")?86400000:21600000;
- const reply=(entry,stale=false)=>new Response(entry.body,{headers:{"Content-Type":"application/json","X-FightHub-Stale":stale?"yes":"no"}});
- if(old&&Date.now()-old.time<ttl)return reply(old);
+ const reply=entry=>noteData(url,new Response(entry.body,{headers:{"Content-Type":"application/json","X-Cache":entry.state==="STALE"?"STALE":"DEVICE CACHE","X-Data-Updated":entry.updated||"unknown"}}));
+ if(old&&Date.now()-old.time<ttl&&old.state!=="STALE")return reply(old);
  if(!eventFeedPending.has(url)){
- const task=(async()=>{try{const r=await fetch(url);if(!r.ok)return {error:r};const body=await r.text();const p=JSON.parse(body);if(!p.data||p.success===false)return {error:new Response(body,{status:502})};const entry={body,time:Date.now()};try{localStorage.setItem(key,JSON.stringify(entry));}catch{}return {entry};}catch(e){return {error:new Response("",{status:503})};}})();
+ const task=(async()=>{try{const r=await trackedFetch(url);if(!r.ok)return {error:r};const body=await r.text();const p=JSON.parse(body);if(!p.data||p.success===false)return {error:new Response(body,{status:502})};const entry={body,time:Date.now(),state:r.headers.get("X-Cache")||"UNKNOWN",updated:r.headers.get("X-Data-Updated")};if(entry.state!=="STALE"){try{localStorage.setItem(key,JSON.stringify(entry));}catch{}}return {entry};}catch(e){return {error:new Response("",{status:503})};}})();
  eventFeedPending.set(url,task);task.finally(()=>eventFeedPending.delete(url));
  }
  const result=await eventFeedPending.get(url);
- if(result.entry)return reply(result.entry);
- // Do not silently present expired schedules as current.
+ if(result.entry)return new Response(result.entry.body,{headers:{"Content-Type":"application/json","X-Cache":result.entry.state,"X-Data-Updated":result.entry.updated||"unknown"}});
  return result.error.clone();
 }
 const eventURL="https://sweet-forest-a1c4.bensharkey4.workers.dev/";
 let events=[], eventState="loading", results=[], resultState="loading", oneState="loading";
 const citoPromotions=["one","cage-warriors","ksw","lfa"];
 const citoFailures=[];
-async function loadOneEvents(){await Promise.all(citoPromotions.map(async org=>{try{const res=await fetch(eventURL+"cito/"+org+"/events/upcoming?limit=25");if(!res.ok)throw Error("Unavailable");const p=await res.json();if(p.success!==true||!Array.isArray(p.data))throw Error("Invalid feed");const rows=p.data.filter(x=>x.slug&&x.name&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)).map(x=>({slug:"cito-"+org+"-"+x.slug,title:x.name,org,sport:org==="one"?"mixed-combat":"mma",starts_at:x.date+"T00:00:00Z",dateOnly:true,location:x.location||x.venue,boutCount:x.boutCount,source:"Cito",status:"scheduled"}));const norm=x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,"");events=mergeRows(events,rows.filter(x=>!events.some(y=>norm(y.title)===norm(x.title)))).sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));}catch(e){citoFailures.push(org);}}));oneState=citoFailures.length?"error":"ready";if((page==="events"||page==="home"||page==="promotions")&&!selectedEvent)render();}
+async function loadOneEvents(){await Promise.all(citoPromotions.map(async org=>{try{const res=await trackedFetch(eventURL+"cito/"+org+"/events/upcoming?limit=25");if(!res.ok)throw Error("Unavailable");const p=await res.json();if(p.success!==true||!Array.isArray(p.data))throw Error("Invalid feed");const rows=p.data.filter(x=>x.slug&&x.name&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)).map(x=>({slug:"cito-"+org+"-"+x.slug,title:x.name,org,sport:org==="one"?"mixed-combat":"mma",starts_at:x.date+"T00:00:00Z",dateOnly:true,location:x.location||x.venue,boutCount:x.boutCount,source:"Cito",status:"scheduled"}));const norm=x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,"");events=mergeRows(events,rows.filter(x=>!events.some(y=>norm(y.title)===norm(x.title)))).sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));}catch(e){citoFailures.push(org);}}));oneState=citoFailures.length?"error":"ready";if((page==="events"||page==="home"||page==="promotions")&&!selectedEvent)render();}
 function eventTime(e){return e.dateOnly?e.starts_at.slice(0,10)+" · Time TBC":ukTime(e.starts_at);}
 const cursors={events:null,results:null,fighters:null}, paging={events:false,results:false,fighters:false};
 function nextCursor(p,previous){const m=p?.meta?.pagination;return m?.has_more===true&&typeof m.next_cursor==="string"&&m.next_cursor!==previous?m.next_cursor:null;}
 function mergeRows(a,b){return [...new Map([...a,...b].filter(x=>x?.slug).map(x=>[x.slug,x])).values()];}
-function moreButton(kind){if(!cursors[kind])return;const b=el("button","btn primary",paging[kind]?"Loading…":kind==="fighters"?"Load more fighters":kind==="results"?"Load older results":"Load more events");b.disabled=paging[kind];b.onclick=async()=>{const cursor=cursors[kind],token=fighterSearchToken; paging[kind]=true;b.disabled=true;b.textContent="Loading…";try{const url=kind==="fighters"?"fighters?q="+encodeURIComponent(fighterQuery):"events?status="+(kind==="results"?"completed":"upcoming");const res=await fetch(eventURL+url+"&cursor="+encodeURIComponent(cursor));if(!res.ok)throw Error("Unavailable");const p=await res.json();if(!Array.isArray(p.data)||kind==="results"&&p.data.some(e=>e.status!=="completed"))throw Error("Invalid feed");if(kind==="fighters"&&token!==fighterSearchToken)return;cursors[kind]=nextCursor(p,cursor);if(kind==="fighters")fighterResults=mergeRows(fighterResults,p.data.filter(f=>f.name));else if(kind==="results")results=mergeRows(results,p.data).sort((a,b)=>Date.parse(b.starts_at)-Date.parse(a.starts_at));else events=mergeRows(events,p.data).sort((a,b)=>Date.parse(a.starts_at)-Date.parse(b.starts_at));paging[kind]=false;if(page===kind&&!selectedEvent&&!fighterProfileOpen)render();}catch{if(b.isConnected){b.disabled=false;b.textContent="Retry loading more";}}finally{paging[kind]=false;}};view.append(b);}
+function moreButton(kind){if(!cursors[kind])return;const b=el("button","btn primary",paging[kind]?"Loading…":kind==="fighters"?"Load more fighters":kind==="results"?"Load older results":"Load more events");b.disabled=paging[kind];b.onclick=async()=>{const cursor=cursors[kind],token=fighterSearchToken; paging[kind]=true;b.disabled=true;b.textContent="Loading…";try{const url=kind==="fighters"?"fighters?q="+encodeURIComponent(fighterQuery):"events?status="+(kind==="results"?"completed":"upcoming");const res=await trackedFetch(eventURL+url+"&cursor="+encodeURIComponent(cursor));if(!res.ok)throw Error("Unavailable");const p=await res.json();if(!Array.isArray(p.data)||kind==="results"&&p.data.some(e=>e.status!=="completed"))throw Error("Invalid feed");if(kind==="fighters"&&token!==fighterSearchToken)return;cursors[kind]=nextCursor(p,cursor);if(kind==="fighters")fighterResults=mergeRows(fighterResults,p.data.filter(f=>f.name));else if(kind==="results")results=mergeRows(results,p.data).sort((a,b)=>Date.parse(b.starts_at)-Date.parse(a.starts_at));else events=mergeRows(events,p.data).sort((a,b)=>Date.parse(a.starts_at)-Date.parse(b.starts_at));paging[kind]=false;if(page===kind&&!selectedEvent&&!fighterProfileOpen)render();}catch{if(b.isConnected){b.disabled=false;b.textContent="Retry loading more";}}finally{paging[kind]=false;}};view.append(b);}
 
 const sportNames={"mixed-combat":"Mixed combat sports","mma":"MMA","boxing":"Boxing","kickboxing":"Kickboxing","muay-thai":"Muay Thai","bare-knuckle-boxing":"Bare-knuckle"};
 function ukTime(value){if(!value)return "TBC";const d=new Date(value);return Number.isNaN(d.getTime())?"TBC":new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Europe/London"}).format(d);}
@@ -206,7 +223,7 @@ function globalEventState(){return events.length?"ready":eventState;} function g
 const citoResultFailures=[];
 async function loadCitoResults(){
  await Promise.all(citoPromotions.map(async org=>{try{
- const res=await fetch(eventURL+"cito/"+org+"/events/recent?limit=25");
+ const res=await trackedFetch(eventURL+"cito/"+org+"/events/recent?limit=25");
  if(!res.ok)throw Error("Unavailable");
  const p=await res.json();if(p.success!==true||!Array.isArray(p.data))throw Error("Invalid feed");
  const rows=p.data.filter(x=>x.status==="completed"&&x.slug&&x.name&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)).map(x=>({slug:"cito-"+org+"-"+x.slug,title:x.name,org,sport:org==="one"?"mixed-combat":"mma",starts_at:x.date+"T00:00:00Z",dateOnly:true,location:x.location||x.venue,boutCount:x.boutCount,source:"Cito",status:"completed"}));
@@ -235,7 +252,7 @@ async function showEvent(e){
  if(e.source==="Cito"){
  const org=e.org,slug=e.slug.slice(("cito-"+org+"-").length);
  try{
- const res=await fetch(eventURL+"cito/"+encodeURIComponent(org)+"/events/"+encodeURIComponent(slug));
+ const res=await trackedFetch(eventURL+"cito/"+encodeURIComponent(org)+"/events/"+encodeURIComponent(slug));
  if(!res.ok)throw Error("Unavailable");const p=await res.json(),d=p.data;
  if(p.success!==true||!d||!Array.isArray(d.card))throw Error("Invalid card");
  if(token!==detailToken||selectedEvent!==e)return;
@@ -297,7 +314,7 @@ async function showComparison(b,e){
  const back=el("button","btn","← Back to fight card");back.onclick=()=>showEvent(e);view.append(back);
  const wrap=el("div","eventdetail");view.append(wrap);wrap.append(el("h2","","Fighter comparison"),el("p","note","Loading both profiles…"));view.scrollIntoView({block:"start"});
  const fighters=[b.fighter_a,b.fighter_b];
- async function profile(f){let d=fighterCache.get(f.slug);if(!d){const res=await fetch(eventURL+"fighters/"+encodeURIComponent(f.slug));if(!res.ok)throw Error("Profile unavailable");d=(await res.json()).data;if(!d?.name)throw Error("Invalid profile");fighterCache.set(f.slug,d);}return d;}
+ async function profile(f){let d=fighterCache.get(f.slug);if(!d){const res=await trackedFetch(eventURL+"fighters/"+encodeURIComponent(f.slug));if(!res.ok)throw Error("Profile unavailable");d=(await res.json()).data;if(!d?.name)throw Error("Invalid profile");fighterCache.set(f.slug,d);}return d;}
  const settled=await Promise.allSettled(fighters.map(profile));if(token!==detailToken)return;
  const ds=settled.map(x=>x.status==="fulfilled"?x.value:null);
  wrap.replaceChildren(el("h2","","Fighter comparison"),el("p","note",[b.weight_class,sportNames[b.sport]||b.sport].filter(Boolean).join(" · ")));
@@ -328,7 +345,7 @@ async function showComparison(b,e){
  if(scope(ds[0])&&scope(ds[0])===scope(ds[1])&&scope(ds[0])===recordKey?.replace(/_/g,"-")){for(const [k,label] of Object.entries({str_acc:"Striking accuracy",str_def:"Striking defence",td_acc:"Takedown accuracy",td_def:"Takedown defence"})){const vals=ds.map(d=>parsePct(d?.stats?.[k]));if(vals.some(v=>v!==null))bars(label,vals);}}
  visual.append(el("p","note","Bars describe recorded performance, not the probability of winning this matchup."));
  wrap.append(el("h3","","Recent form"));const form=el("div","comparetable");wrap.append(form);const loading=el("p","note","Loading recent completed fights…");wrap.append(loading);
- const histories=await Promise.allSettled(fighters.map(async f=>{const res=await fetch(eventURL+"fighters/"+encodeURIComponent(f.slug)+"/history");if(!res.ok)throw Error("Unavailable");const p=await res.json();if(!Array.isArray(p.data))throw Error("Invalid history");const aliases={"bare-knuckle-boxing":"knuckle","bare-knuckle":"knuckle","pro-knuckle":"knuckle"};const norm=x=>aliases[x]||x;const seen=new Set();return p.data.filter(x=>x&&["win","loss","draw","nc","no contest","no_contest","w","l","d"].includes(String(x.result).toLowerCase())&&(!b.sport||norm(x.sport)===norm(b.sport))&&x.competition_level!=="amateur").sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).filter(x=>{const key=[x.date,String(x.opponent_name||x.opponent?.name||"").toLowerCase()].join("|");if(seen.has(key))return false;seen.add(key);return true;}).slice(0,5);}));
+ const histories=await Promise.allSettled(fighters.map(async f=>{const res=await trackedFetch(eventURL+"fighters/"+encodeURIComponent(f.slug)+"/history");if(!res.ok)throw Error("Unavailable");const p=await res.json();if(!Array.isArray(p.data))throw Error("Invalid history");const aliases={"bare-knuckle-boxing":"knuckle","bare-knuckle":"knuckle","pro-knuckle":"knuckle"};const norm=x=>aliases[x]||x;const seen=new Set();return p.data.filter(x=>x&&["win","loss","draw","nc","no contest","no_contest","w","l","d"].includes(String(x.result).toLowerCase())&&(!b.sport||norm(x.sport)===norm(b.sport))&&x.competition_level!=="amateur").sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).filter(x=>{const key=[x.date,String(x.opponent_name||x.opponent?.name||"").toLowerCase()].join("|");if(seen.has(key))return false;seen.add(key);return true;}).slice(0,5);}));
  if(token!==detailToken)return;loading.remove();const fr=el("div","comparerow");fr.append(el("span","","Last five in bout discipline"));histories.forEach(h=>{const col=el("div","");if(h.status!=="fulfilled"||!h.value.length)col.append(el("span","note","Unavailable"));else h.value.forEach(x=>{const result=String(x.result).toUpperCase();const line=el("p","",result+" · "+(x.opponent_name||x.opponent?.name||"Unknown"));line.style.color=["WIN","W"].includes(result)?"var(--green)":["LOSS","L"].includes(result)?"#ef9999":"var(--muted)";col.append(line);});fr.append(col);});form.append(fr);
  const recent=el("section","");wrap.append(el("h3","","Recent winning methods"),recent);
  histories.forEach((h,i)=>{const card=el("div","fightrow");card.append(el("strong","",fighters[i].name));const entries=h.status==="fulfilled"?h.value:[];const wins=entries.filter(x=>["win","w"].includes(String(x.result).toLowerCase()));const methods=wins.map(x=>String(x.method_normalized||x.method||"").toLowerCase());const ko=methods.filter(x=>/^(ko|tko|knockout|technical knockout)(\\b|_)/.test(x)).length;const sub=methods.filter(x=>/^submission(\\b|_)/.test(x)).length;card.append(el("p","note",entries.length? wins.length+" wins in "+entries.length+" available recent bouts":"Recent history unavailable"));if(wins.length){card.append(el("p","","KO/TKO: "+ko+" · Submission: "+sub));card.append(el("p","note","Counts of identified methods among recent wins, not career finish rates. Other or missing methods are not classified."));}recent.append(card);});
@@ -379,7 +396,7 @@ function loadCardPortrait(f,container){
  if(!fighterCache.has(f.slug))return;
  const slug=f.slug;
  if(!cardPortraitRequests.has(slug)){
- const task=cardPortraitQueue.then(async()=>{if(fighterCache.has(slug))return fighterCache.get(slug);const res=await fetch(eventURL+"fighters/"+encodeURIComponent(slug));if(!res.ok)throw Error("Unavailable");const d=(await res.json()).data;if(!d?.name)throw Error("Invalid profile");fighterCache.set(slug,d);return d;});
+ const task=cardPortraitQueue.then(async()=>{if(fighterCache.has(slug))return fighterCache.get(slug);const res=await trackedFetch(eventURL+"fighters/"+encodeURIComponent(slug));if(!res.ok)throw Error("Unavailable");const d=(await res.json()).data;if(!d?.name)throw Error("Invalid profile");fighterCache.set(slug,d);return d;});
  cardPortraitRequests.set(slug,task);cardPortraitQueue=task.catch(()=>{});
  task.catch(()=>cardPortraitRequests.delete(slug));
  }
@@ -464,7 +481,7 @@ function citoVisual(d,org){
 async function showCitoComparison(org,fs,e){
  const token=++detailToken;view.replaceChildren();const back=el("button","btn","← Back to fight card");back.onclick=()=>showEvent(e);view.append(back);
  const wrap=el("div","eventdetail");view.append(wrap);wrap.append(el("h2","","Fighter comparison"),el("p","note","Loading promotion profiles…"));
- const ds=await Promise.all(fs.map(async f=>{try{const res=await fetch(eventURL+"cito/"+encodeURIComponent(org)+"/fighters/"+encodeURIComponent(f.fighterSlug));if(!res.ok)return null;const p=await res.json();return p.success===true&&p.data?.name?p.data:null;}catch{return null;}}));
+ const ds=await Promise.all(fs.map(async f=>{try{const res=await trackedFetch(eventURL+"cito/"+encodeURIComponent(org)+"/fighters/"+encodeURIComponent(f.fighterSlug));if(!res.ok)return null;const p=await res.json();return p.success===true&&p.data?.name?p.data:null;}catch{return null;}}));
  if(token!==detailToken)return;wrap.replaceChildren(el("h2","","Fighter comparison"),el("p","note",org.toUpperCase()+" · Promotion archive data"));
  const table=el("div","");const header=el("div","comparerow comparehead");header.append(el("span","","Fighter"));fs.forEach((f,i)=>{const link=el("button","eventlink",ds[i]?.name||f.fighterName||"Fighter");link.onclick=()=>showCitoFighter(org,f.fighterSlug,f.fighterName,e);header.append(link);});table.append(header);
  const add=(label,values)=>{const row=el("div","comparerow");row.append(el("span","",label),...values.map(v=>el("strong","",v==null||v===""?"—":String(v))));table.append(row);};
@@ -482,7 +499,7 @@ async function showCitoFighter(org,slug,name,e){
  const back=el("button","btn",e?"← Back to fight card":"← Back to fighter search");back.onclick=()=>e?showEvent(e):render();view.append(back);
  const wrap=el("div","eventdetail");view.append(wrap);wrap.append(el("h2","",name),el("p","note","Loading fighter profile…"));view.scrollIntoView({block:"start"});
  try{
- const res=await fetch(eventURL+"cito/"+encodeURIComponent(org)+"/fighters/"+encodeURIComponent(slug));
+ const res=await trackedFetch(eventURL+"cito/"+encodeURIComponent(org)+"/fighters/"+encodeURIComponent(slug));
  if(!res.ok)throw Error("Unavailable");const p=await res.json(),d=p.data;
  if(p.success!==true||!d||!d.name)throw Error("Invalid profile");
  if(token!==detailToken)return;
@@ -516,7 +533,7 @@ async function showFighter(f,e){
  view.scrollIntoView({block:"start"});
  try{
  let d=fighterCache.get(f.slug);
- if(!d){const res=await fetch(eventURL+"fighters/"+encodeURIComponent(f.slug));if(!res.ok)throw Error("Unavailable");d=(await res.json()).data;if(!d||!d.name)throw Error("Invalid profile");fighterCache.set(f.slug,d);}
+ if(!d){const res=await trackedFetch(eventURL+"fighters/"+encodeURIComponent(f.slug));if(!res.ok)throw Error("Unavailable");d=(await res.json()).data;if(!d||!d.name)throw Error("Invalid profile");fighterCache.set(f.slug,d);}
  if(token!==detailToken)return;
  wrap.replaceChildren(el("h2","",d.name),el("p","note",[d.nickname,d.nationality].filter(Boolean).join(" · ")));
  wrap.prepend(fighterPortrait(d));
@@ -535,7 +552,7 @@ async function showFighter(f,e){
  const history=el("section","");wrap.append(el("h3","","Career fight history"),history);
  history.append(el("p","note","Loading career history…"));
  const loadHistory=async()=>{try{
- const res=await fetch(eventURL+"fighters/"+encodeURIComponent(f.slug)+"/history");if(!res.ok)throw Error("Unavailable");const payload=await res.json();if(!Array.isArray(payload.data))throw Error("Invalid history");if(token!==detailToken)return;
+ const res=await trackedFetch(eventURL+"fighters/"+encodeURIComponent(f.slug)+"/history");if(!res.ok)throw Error("Unavailable");const payload=await res.json();if(!Array.isArray(payload.data))throw Error("Invalid history");if(token!==detailToken)return;
  const completed=payload.data.filter(b=>b&&b.result&&!["upcoming","scheduled","announced","cancelled","canceled"].includes(String(b.result).toLowerCase())&&!["upcoming","scheduled","announced","cancelled","canceled"].includes(String(b.status).toLowerCase())).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
  history.replaceChildren(el("p","note",completed.length+" completed fight entries returned · MMA Calendar · Records may include multiple disciplines or overlapping sources."));
  if(!completed.length)history.append(emptyBlock("🥊","No completed fights supplied","Career history may be incomplete."));
@@ -556,7 +573,7 @@ function renderFighterSearch(){
  const form=el("form","formrow"),input=el("input","field");input.placeholder="Search fighter name";input.value=fighterQuery;input.required=true;input.minLength=2;input.maxLength=100;input.setAttribute("aria-label","Fighter name");
  const submit=el("button","btn primary","Search");submit.type="submit";form.append(input,submit);
  form.onsubmit=async e=>{e.preventDefault();const q=input.value.trim();if(q.length<2)return;const org=fighterSearchOrg;fighterQuery=q;cursors.fighters=null;fighterSearchTruncated=false;fighterState="loading";const token=++fighterSearchToken;render();
- try{const res=await fetch(eventURL+(org==="primary"?"fighters":"cito/"+org+"/fighters")+"?q="+encodeURIComponent(q));if(!res.ok)throw Error("Unavailable");const p=await res.json();if(!Array.isArray(p.data)||(org!=="primary"&&p.success!==true))throw Error("Invalid search");if(token!==fighterSearchToken)return;fighterResults=p.data.filter(f=>f?.slug&&f?.name);if(org==="primary")cursors.fighters=nextCursor(p,null);else fighterSearchTruncated=!!p.meta?.hasNextPage;fighterState="ready";}catch{if(token!==fighterSearchToken)return;fighterState="error";}if(page==="fighters"&&!fighterProfileOpen)render();};view.append(form);
+ try{const res=await trackedFetch(eventURL+(org==="primary"?"fighters":"cito/"+org+"/fighters")+"?q="+encodeURIComponent(q));if(!res.ok)throw Error("Unavailable");const p=await res.json();if(!Array.isArray(p.data)||(org!=="primary"&&p.success!==true))throw Error("Invalid search");if(token!==fighterSearchToken)return;fighterResults=p.data.filter(f=>f?.slug&&f?.name);if(org==="primary")cursors.fighters=nextCursor(p,null);else fighterSearchTruncated=!!p.meta?.hasNextPage;fighterState="ready";}catch{if(token!==fighterSearchToken)return;fighterState="error";}if(page==="fighters"&&!fighterProfileOpen)render();};view.append(form);
  if(fighterState==="idle"){view.append(emptyBlock("🥊","Find a fighter","Choose a promotion or data source, then enter a fighter name."));return;}
  if(fighterState==="loading"){view.append(el("p","note","Searching fighters…"));return;}
  if(fighterState==="error"){view.append(emptyBlock("⚠️","Search unavailable","Please try again."));return;}
@@ -576,7 +593,7 @@ function renderRankings(){
  const wrap=el("div","rankings");view.append(wrap);wrap.append(el("p","note","Loading rankings…"));
  const chosen=rankingOrg;
  (async()=>{try{
- let d=rankingCache.get(chosen);if(!d){const res=await fetch(eventURL+"rankings/"+chosen);if(!res.ok)throw Error("Unavailable");d=(await res.json()).data;if(!Array.isArray(d?.divisions))throw Error("Invalid rankings");rankingCache.set(chosen,d);}
+ let d=rankingCache.get(chosen);if(!d){const res=await trackedFetch(eventURL+"rankings/"+chosen);if(!res.ok)throw Error("Unavailable");d=(await res.json()).data;if(!Array.isArray(d?.divisions))throw Error("Invalid rankings");rankingCache.set(chosen,d);}
  if(token!==rankingToken||page!=="rankings"||!wrap.isConnected)return;
  wrap.replaceChildren();wrap.append(el("p","note","MMA Calendar · "+(d.board||"Rankings")+" · Snapshot: "+(d.snapshot_date||"Not supplied")));
  const divisions=d.divisions.filter(x=>typeof x.division==="string"&&Array.isArray(x.entries));if(!divisions.length){wrap.append(el("p","note","No divisions supplied."));return;}
