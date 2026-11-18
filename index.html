@@ -215,8 +215,23 @@ function renderFeatured(){
  const highlights=el("div","spotlights");box.append(highlights);
  const upcoming=events.filter(x=>x.slug&&Date.parse(x.starts_at)>Date.now()&&x.slug!==e.slug).sort((a,b)=>Date.parse(a.starts_at)-Date.parse(b.starts_at)).slice(0,3);
  if(preferences.highlights&&upcoming.length){highlights.append(el("h3","","Coming up next"));for(const x of upcoming){const row=el("div","spotlightrow");const link=el("button","eventlink",x.title);link.onclick=()=>showEvent(x);row.append(link,el("small","note",eventTime(x)));highlights.append(row);}}
- if(!preferences.spotlight)return;const fighterSection=el("div","");highlights.append(fighterSection);
- (async()=>{try{let d;try{d=await getEventDetail(e.slug);}catch(err){if(token!==detailToken||selectedEvent!==e)return;const message=err.httpStatus===429?"The data service returned HTTP 429 (request limit).":err.httpStatus?"The data service returned HTTP "+err.httpStatus+".":err.invalidData?"The data service returned an unexpected event response.":"The event data could not be downloaded. Check your connection and retry.";wrap.replaceChildren(el("h2","",e.title),el("p","note",eventTime(e)),emptyBlock("⚠️","Fight card unavailable",message));const retry=el("button","btn","Retry");retry.onclick=()=>showEvent(e);wrap.append(retry);return;}if(!Array.isArray(d.card))return;if(!fighterSection.isConnected||box.hidden)return;const bout=d.card.find(x=>x?.is_main&&x.fighter_a?.slug&&x.fighter_b?.slug);if(!bout)return;fighterSection.append(el("h3","","Main event fighter spotlight"));const grid=el("div","spotlightfighters");for(const f of [bout.fighter_a,bout.fighter_b]){const card=el("div","compareportrait");const portrait=el("div","");portrait.append(fighterPortrait(fighterCache.get(f.slug)||f));card.append(portrait);const link=el("button","eventlink",f.name||"Fighter");link.onclick=()=>{box.hidden=true;clearInterval(featuredTimer);showFighter(f,e);};card.append(link);grid.append(card);if(fighterCache.has(f.slug))loadCardPortrait(f,portrait);}fighterSection.append(grid);}catch{}})();
+ // Spotlight uses only already loaded MMA Calendar cards; no background API calls.
+ if(!preferences.spotlight||e.source==="Cito"||e.slug.startsWith("cito-"))return;
+ const d=detailCache.get(e.slug);
+ if(!d||!Array.isArray(d.card))return;
+ const bout=d.card.find(x=>x?.is_main&&x.fighter_a?.slug&&x.fighter_b?.slug);
+ if(!bout)return;
+ const fighterSection=el("div","");highlights.append(fighterSection);
+ fighterSection.append(el("h3","","Main event fighter spotlight"));
+ const grid=el("div","spotlightfighters");
+ for(const f of [bout.fighter_a,bout.fighter_b]){
+ const card=el("div","compareportrait");
+ card.append(fighterPortrait(fighterCache.get(f.slug)||f));
+ const link=el("button","eventlink",f.name||"Fighter");
+ link.onclick=()=>{box.hidden=true;clearInterval(featuredTimer);showFighter(f,e);};
+ card.append(link);grid.append(card);
+ }
+ fighterSection.append(grid);
 
 }
 function globalEventState(){return events.length?"ready":eventState;} function globalEvents(){return events;}
@@ -249,7 +264,7 @@ async function showEvent(e){
  const wrap=el("div","eventdetail");view.append(wrap);
  wrap.append(el("h2","",e.title),el("p","note","Loading fight card…"));
  view.scrollIntoView({block:"start"});
- if(e.source==="Cito"){
+ if(e.source==="Cito"||e.slug.startsWith("cito-")){
  const org=e.org,slug=e.slug.slice(("cito-"+org+"-").length);
  try{
  const res=await trackedFetch(eventURL+"cito/"+encodeURIComponent(org)+"/events/"+encodeURIComponent(slug));
