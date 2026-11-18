@@ -93,7 +93,7 @@ const list=el("div","resultlist");
 matches.forEach(e=>{const row=el("div","item"),info=el("div","");const open=el("button","eventlink",e.title);open.type="button";open.disabled=!e.slug;open.addEventListener("click",()=>showEvent(e));info.append(open,el("small","",(e.org||"").toUpperCase()+" · "+(sportNames[e.sport]||e.sport||"Combat sports")),el("small","","Starts: "+ukTime(e.starts_at)));if(e.main_card_at)info.append(el("small","","Main card: "+ukTime(e.main_card_at)));const save=el("button","btn","☆ Save");save.addEventListener("click",()=>addSave(e.title,"Event",sportNames[e.sport]||e.sport));row.append(info,save);list.append(row);});view.append(list);}
 function globalEventState(){return eventState;} function globalEvents(){return events;}
 async function loadResults(){try{const response=await fetch(eventURL+"events?status=completed");if(!response.ok)throw Error("Unavailable");const payload=await response.json();if(!Array.isArray(payload.data)||payload.data.some(e=>e.status!=="completed"))throw Error("Invalid completed feed");results=payload.data.filter(e=>e&&typeof e.title==="string").sort((a,b)=>new Date(b.starts_at)-new Date(a.starts_at));resultState="ready";}catch(e){resultState="error";}if(page==="results"&&!selectedEvent)render();}
-async function loadEvents(){try{const response=await fetch(eventURL+"events");if(!response.ok)throw Error("Feed unavailable");const payload=await response.json();if(!Array.isArray(payload.data))throw Error("Invalid feed");events=payload.data.filter(e=>e&&typeof e.title==="string").sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));eventState="ready";}catch(e){eventState="error";}if(page==="events")render();}
+async function loadEvents(){try{const response=await fetch(eventURL+"events");if(!response.ok)throw Error("Feed unavailable");const payload=await response.json();if(!Array.isArray(payload.data))throw Error("Invalid feed");events=payload.data.filter(e=>e&&typeof e.title==="string").sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));eventState="ready";}catch(e){eventState="error";}if(page==="events"&&!selectedEvent)render();}
 
 
 let selectedEvent=null, detailToken=0;
@@ -153,8 +153,9 @@ async function showComparison(b,e){
  if(ds.some(d=>!d)){const retry=el("button","btn","Retry comparison");retry.onclick=()=>showComparison(b,e);wrap.append(retry);}
 }
 async function showFighter(f,e){
+ fighterProfileOpen=true;
  const token=++detailToken;view.replaceChildren();
- const back=el("button","btn","← Back to fight card");back.onclick=()=>showEvent(e);view.append(back);
+ const back=el("button","btn",e?"← Back to fight card":"← Back to fighter search");back.onclick=()=>e?showEvent(e):render();view.append(back);
  const wrap=el("div","eventdetail");view.append(wrap);wrap.append(el("h2","",f.name),el("p","note","Loading fighter profile…"));
  view.scrollIntoView({block:"start"});
  try{
@@ -188,8 +189,21 @@ async function showFighter(f,e){
  }catch(err){if(token!==detailToken)return;wrap.replaceChildren(el("h2","",f.name),emptyBlock("⚠️","Profile unavailable","Try again later. The provider may have reached its request limit."));const retry=el("button","btn","Retry");retry.onclick=()=>showFighter(f,e);wrap.append(retry);}
 }
 
-function render(){selectedEvent=null;++detailToken;view.replaceChildren();const p=pages[page];const heading=el("div","heading");heading.append(el("h2","",p.title),el("span","pill",page==="events"?(eventState==="ready"?"EVENT FEED":eventState==="loading"?"LOADING":"UNAVAILABLE"):page==="results"?(resultState==="ready"?"RESULTS FEED":resultState==="loading"?"LOADING":"UNAVAILABLE"):page==="promotions"?"STARTER DIRECTORY":"LIVE DATA NOT CONNECTED"));view.append(heading);
+let fighterQuery="", fighterResults=[], fighterState="idle", fighterSearchToken=0;
+function renderFighterSearch(){
+ const form=el("form","formrow"), input=el("input","field");input.placeholder="Search fighter name";input.value=fighterQuery;input.required=true;input.minLength=2;input.maxLength=100;input.setAttribute("aria-label","Fighter name");
+ const submit=el("button","btn primary","Search");submit.type="submit";form.append(input,submit);form.onsubmit=async e=>{e.preventDefault();const q=input.value.trim();if(q.length<2)return;fighterQuery=q;fighterState="loading";const token=++fighterSearchToken;render();try{const res=await fetch(eventURL+"fighters?q="+encodeURIComponent(q));if(!res.ok)throw Error("Unavailable");const p=await res.json();if(!Array.isArray(p.data))throw Error("Invalid search");if(token!==fighterSearchToken)return;fighterResults=p.data.filter(f=>f?.slug&&f?.name);fighterState="ready";}catch(err){if(token!==fighterSearchToken)return;fighterState="error";}if(page==="fighters"&&!fighterProfileOpen)render();};view.append(form);
+ if(fighterState==="idle"){view.append(emptyBlock("🥊","Find a fighter","Enter a name to find profiles, records and fight history."));return;}
+ if(fighterState==="loading"){view.append(el("p","note","Searching fighters…"));return;}
+ if(fighterState==="error"){view.append(emptyBlock("⚠️","Search unavailable","Please try again."));return;}
+ view.append(el("p","note",fighterResults.length+" matches returned · MMA Calendar · First page only"));
+ if(!fighterResults.length)view.append(emptyBlock("🔎","No fighters found","Try a different spelling or surname."));
+ const list=el("div","resultlist");for(const f of fighterResults){const row=el("div","item"),info=el("div","");const link=el("button","eventlink",f.name);link.onclick=()=>showFighter(f,null);info.append(link,el("small","",[f.nickname,f.nationality].filter(Boolean).join(" · ")));row.append(info);list.append(row);}view.append(list);
+}
+let fighterProfileOpen=false;
+function render(){fighterProfileOpen=false;search.disabled=page==="fighters";sport.disabled=page==="fighters";selectedEvent=null;++detailToken;view.replaceChildren();const p=pages[page];const heading=el("div","heading");heading.append(el("h2","",p.title),el("span","pill",page==="events"?(eventState==="ready"?"EVENT FEED":eventState==="loading"?"LOADING":"UNAVAILABLE"):page==="results"?(resultState==="ready"?"RESULTS FEED":resultState==="loading"?"LOADING":"UNAVAILABLE"):page==="promotions"?"STARTER DIRECTORY":page==="fighters"?"FIGHTER SEARCH":"LIVE DATA NOT CONNECTED"));view.append(heading);
 if(page==="events"||page==="results"){renderEvents();return;}
+if(page==="fighters"){renderFighterSearch();return;}
 if(page==="saved"){renderSaved();return;}
 if(page==="promotions"){view.append(emptyBlock(p.icon,p.headline,p.body));renderPromotions();return;}
 view.append(emptyBlock(p.icon,p.headline,p.body));
