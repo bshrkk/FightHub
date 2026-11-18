@@ -1,1 +1,18 @@
-{"name":"FightHub — Combat Sports","short_name":"FightHub","start_url":"./","display":"standalone","background_color":"#0d0f14","theme_color":"#0d0f14","description":"Worldwide combat sports events, results, fighters and odds."}
+{
+  "name": "FightHub — Combat Sports Hub",
+  "short_name": "FightHub",
+  "description": "Worldwide combat sports events, results, fighter profiles and odds research.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d0f14",
+  "theme_color": "#0d0f14",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
