@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0d0f14"><meta name="description" content="FightHub — worldwide combat sports events, results, fighter profiles and odds.">
+<meta name="theme-color" content="#0d0f14"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"><meta name="description" content="FightHub — worldwide combat sports events, results, fighter profiles and odds.">
 <link rel="manifest" href="./manifest.json"><title>FightHub | Combat Sports Hub</title>
 <style>
 :root{color-scheme:dark;--bg:#0d0f14;--panel:#171a22;--panel2:#20242e;--line:#303644;--muted:#9da5b5;--text:#f5f6fa;--gold:#e7a85e;--green:#70d6a0}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px Inter,system-ui,-apple-system,Segoe UI,sans-serif}button,input,select{font:inherit}button{cursor:pointer}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px Manrope,system-ui,-apple-system,Segoe UI,sans-serif}button,input,select{font:inherit}button{cursor:pointer}
 .top{position:sticky;top:0;z-index:5;background:#0d0f14ed;backdrop-filter:blur(14px);border-bottom:1px solid var(--line);padding:15px max(18px,calc((100vw - 1080px)/2))}
-.brand{font-size:24px;font-weight:950;letter-spacing:-1.3px}.brand span{color:var(--gold)}.sub{font-size:11px;color:var(--muted);letter-spacing:1.3px;text-transform:uppercase}
-.shell{max-width:1080px;margin:auto;padding:22px 18px 60px}.hero{border:1px solid #49403a;border-radius:20px;padding:25px;background:radial-gradient(ellipse at 90% 0%,#59402b 0,transparent 48%),linear-gradient(130deg,#22232a,#14161d)}
-.eyebrow{color:var(--gold);font-size:11px;font-weight:850;letter-spacing:2px}.hero h1{font-size:clamp(28px,5vw,44px);line-height:1.04;letter-spacing:-1.7px;margin:12px 0}.hero p{color:#c0c4ce;max-width:580px;line-height:1.55;margin:0}
+.brand{font-family:"Barlow Condensed",Impact,sans-serif;font-size:27px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase}.brand span{color:var(--gold)}.sub{font-family:Manrope,sans-serif;font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+.shell{max-width:1080px;margin:auto;padding:22px 18px 60px}.hero{border:1px solid #49403a;border-radius:20px;padding:clamp(34px,7vw,68px) 24px;text-align:center;background:radial-gradient(ellipse at 50% 0%,#59402b 0,transparent 58%),linear-gradient(130deg,#22232a,#14161d)}
+.eyebrow{font-family:Manrope,sans-serif;color:var(--gold);font-size:11px;font-weight:800;letter-spacing:3px}.hero h1{font-family:"Barlow Condensed",Impact,sans-serif;font-size:clamp(66px,13vw,112px);font-weight:900;line-height:.88;letter-spacing:1px;text-transform:uppercase;margin:14px 0 8px}.hero h1 span{color:var(--gold)}.hero .tagline{font-family:Manrope,sans-serif;color:#f5f6fa;font-size:clamp(13px,2.4vw,17px);font-weight:700;letter-spacing:2px;text-transform:uppercase;margin:0 auto 12px}.hero p{color:#c0c4ce;max-width:580px;line-height:1.55;margin:0 auto}
 .sportlist{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.sportlist span{font-size:12px;background:var(--panel2);padding:8px 10px;border-radius:8px;color:#d6d9e0}
 .nav{display:flex;gap:8px;overflow:auto;padding:18px 0}.nav button,.btn{white-space:nowrap;border:1px solid var(--line);border-radius:999px;padding:10px 15px;background:var(--panel);color:var(--muted);font-weight:750}.nav button.active,.btn.primary{background:var(--gold);color:#19140e;border-color:var(--gold)}
 .tools{display:flex;gap:10px;flex-wrap:wrap;margin:3px 0 20px}.tools input,.tools select,.field{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:11px;padding:12px;min-width:0;flex:1}
@@ -24,7 +24,7 @@
 <body>
 <header class="top"><div class="brand">FIGHT<span>HUB</span></div><div class="sub">The world of combat sports</div></header>
 <main class="shell">
-<section class="hero"><div class="eyebrow">ONE HUB. EVERY FIGHT.</div><h1>Stay close to<br>the action.</h1><p>Discover events, follow fighters, review results and compare fight odds across MMA, boxing and combat sports worldwide.</p><div class="sportlist"><span>MMA</span><span>BOXING</span><span>KICKBOXING</span><span>MUAY THAI</span><span>BARE-KNUCKLE</span></div></section>
+<section class="hero"><div class="eyebrow">ONE HUB. EVERY FIGHT.</div><h1>FIGHT<span>HUB</span></h1><p class="tagline">GET CLOSE TO THE ACTION</p><p>Every promotion. Every discipline. One place to follow the world of combat sports.</p></section>
 <nav class="nav" aria-label="Main sections">
 <button class="active" data-page="events">Events</button><button data-page="results">Results</button><button data-page="fighters">Fighters</button><button data-page="promotions">Promotions</button><button data-page="odds">Odds centre</button><button data-page="saved">Saved</button>
 </nav>
