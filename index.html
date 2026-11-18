@@ -115,17 +115,26 @@ const q=search.value.trim().toLowerCase(),selected=sport.value;
 const matches=promotionData.filter(p=>(!q||(p.name+" "+p.kind+" "+p.sport).toLowerCase().includes(q))&&(!selected||p.sport===selected||(p.name==="ONE Championship"&&["Kickboxing","Muay Thai"].includes(selected))));
 const list=el("div","resultlist");if(!matches.length)list.append(emptyBlock("🔎","No matching promotions","Try another search or sport filter."));
 matches.forEach(p=>{const row=el("div","item"),info=el("div","");const open=el("button","eventlink",p.name);open.onclick=()=>showPromotion(p);info.append(open,el("small","",p.sport+" · "+p.kind));const save=el("button","btn","☆ Follow");save.onclick=()=>addSave(p.name,"Promotion",p.sport);row.append(info,save);list.append(row);});view.append(list);}
-function showPromotion(p){
+async function showPromotion(p){
 const token=++detailToken;view.replaceChildren();const back=el("button","btn","← All promotions");back.onclick=render;view.append(back,el("h2","",p.name),el("p","note",p.kind));
 const norm=x=>String(x||"").toLowerCase().replace(/[^a-z0-9]/g,"");
 const aliases={"ONE Championship":["one","onechampionship"],"Cage Warriors":["cw","cagewarriors"],"OKTAGON MMA":["oktagon","oktagonmma"],"Matchroom Boxing":["matchroom","matchroomboxing"],"Queensberry Promotions":["queensberry","queensberrypromotions"]};
 const keys=aliases[p.name]||[norm(p.name)];
-for(const [title,items,state] of [["Upcoming events",events,eventState],["Recent results",results,resultState]]){
+let feeds=[["Upcoming events",events,eventState],["Recent results",results,resultState]];
+if(p.name==="RIZIN"){
+ const loading=el("p","note","Loading dedicated RIZIN feeds…");view.append(loading);
+ feeds=await Promise.all(["upcoming","completed"].map(async status=>{
+ const title=status==="completed"?"Recent results":"Upcoming events";
+ try{const res=await fetch(eventURL+"events?org=rizin&status="+status);if(!res.ok)throw Error("Unavailable");const payload=await res.json();if(!Array.isArray(payload.data))throw Error("Invalid feed");const rows=payload.data.filter(e=>e.org==="rizin"&&e.slug&&e.title&&(status!=="completed"||e.status==="completed"));return [title,rows,"ready"];}catch{return [title,[], "error"];}
+ }));
+ if(token!==detailToken||!loading.isConnected)return;loading.remove();
+}
+for(const [title,items,state] of feeds){
 view.append(el("h3","",title));const matches=items.filter(e=>keys.includes(norm(e.org)));
 if(!matches.length)view.append(el("p","note",state==="ready"?"No matching events in the currently loaded feed.":"Feed not available yet."));
-for(const e of matches){const row=el("div","item"),info=el("div","");const link=el("button","eventlink",e.title);link.onclick=()=>{page=title==="Recent results"?"results":"events";document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===page));showEvent(e);};info.append(link,el("small","",(isResults?"Date: ":"Starts: ")+eventTime(e)));row.append(info);view.append(row);}
+for(const e of matches){const row=el("div","item"),info=el("div","");const link=el("button","eventlink",e.title);link.onclick=()=>{page=title==="Recent results"?"results":"events";document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===page));showEvent(e);};info.append(link,el("small","",(title==="Recent results"?"Date: ":"Starts: ")+eventTime(e)));row.append(info);view.append(row);}
 }
-view.append(el("p","note","Sources: MMA Calendar and Cito. Loaded events only; directory inclusion does not guarantee coverage."));
+view.append(el("p","note",p.name==="RIZIN"?"Source: MMA Calendar · Dedicated RIZIN feed · Up to 25 events per list.":"Sources: MMA Calendar and Cito. Loaded events only; directory inclusion does not guarantee coverage."));
 const follow=el("button","btn","☆ Follow promotion");follow.onclick=()=>{if(!saved.some(x=>x.name===p.name&&x.type==="Promotion")){saved.push({name:p.name,type:"Promotion",category:p.sport});persist();}follow.textContent="★ Following";};view.append(follow);
 }
 const eventURL="https://sweet-forest-a1c4.bensharkey4.workers.dev/";
