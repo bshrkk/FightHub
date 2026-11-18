@@ -380,7 +380,7 @@ async function showCitoComparison(org,fs,e){
 async function showCitoFighter(org,slug,name,e){
  fighterProfileOpen=true;
  const token=++detailToken;view.replaceChildren();
- const back=el("button","btn","← Back to fight card");back.onclick=()=>showEvent(e);view.append(back);
+ const back=el("button","btn",e?"← Back to fight card":"← Back to fighter search");back.onclick=()=>e?showEvent(e):render();view.append(back);
  const wrap=el("div","eventdetail");view.append(wrap);wrap.append(el("h2","",name),el("p","note","Loading fighter profile…"));view.scrollIntoView({block:"start"});
  try{
  const res=await fetch(eventURL+"cito/"+encodeURIComponent(org)+"/fighters/"+encodeURIComponent(slug));
@@ -447,15 +447,23 @@ async function showFighter(f,e){
 }
 
 let fighterQuery="", fighterResults=[], fighterState="idle", fighterSearchToken=0;
+let fighterSearchOrg="primary",fighterSearchTruncated=false;
+const fighterSearchSources=[["primary","MMA Calendar (UFC and others)"],["one","ONE Championship"],["cage-warriors","Cage Warriors"],["ksw","KSW"],["lfa","LFA"]];
 function renderFighterSearch(){
- const form=el("form","formrow"), input=el("input","field");input.placeholder="Search fighter name";input.value=fighterQuery;input.required=true;input.minLength=2;input.maxLength=100;input.setAttribute("aria-label","Fighter name");
- const submit=el("button","btn primary","Search");submit.type="submit";form.append(input,submit);form.onsubmit=async e=>{e.preventDefault();const q=input.value.trim();if(q.length<2)return;fighterQuery=q;cursors.fighters=null;fighterState="loading";const token=++fighterSearchToken;render();try{const res=await fetch(eventURL+"fighters?q="+encodeURIComponent(q));if(!res.ok)throw Error("Unavailable");const p=await res.json();if(!Array.isArray(p.data))throw Error("Invalid search");if(token!==fighterSearchToken)return;fighterResults=p.data.filter(f=>f?.slug&&f?.name);cursors.fighters=nextCursor(p,null);fighterState="ready";}catch(err){if(token!==fighterSearchToken)return;fighterState="error";}if(page==="fighters"&&!fighterProfileOpen)render();};view.append(form);
- if(fighterState==="idle"){view.append(emptyBlock("🥊","Find a fighter","Enter a name to find profiles, records and fight history."));return;}
+ const select=el("select","field");select.setAttribute("aria-label","Search promotion");
+ for(const [v,t] of fighterSearchSources){const o=el("option","",t);o.value=v;select.append(o);}
+ select.value=fighterSearchOrg;select.onchange=()=>{fighterSearchOrg=select.value;++fighterSearchToken;fighterResults=[];cursors.fighters=null;fighterState="idle";render();};view.append(select);
+ const form=el("form","formrow"),input=el("input","field");input.placeholder="Search fighter name";input.value=fighterQuery;input.required=true;input.minLength=2;input.maxLength=100;input.setAttribute("aria-label","Fighter name");
+ const submit=el("button","btn primary","Search");submit.type="submit";form.append(input,submit);
+ form.onsubmit=async e=>{e.preventDefault();const q=input.value.trim();if(q.length<2)return;const org=fighterSearchOrg;fighterQuery=q;cursors.fighters=null;fighterSearchTruncated=false;fighterState="loading";const token=++fighterSearchToken;render();
+ try{const res=await fetch(eventURL+(org==="primary"?"fighters":"cito/"+org+"/fighters")+"?q="+encodeURIComponent(q));if(!res.ok)throw Error("Unavailable");const p=await res.json();if(!Array.isArray(p.data)||(org!=="primary"&&p.success!==true))throw Error("Invalid search");if(token!==fighterSearchToken)return;fighterResults=p.data.filter(f=>f?.slug&&f?.name);if(org==="primary")cursors.fighters=nextCursor(p,null);else fighterSearchTruncated=!!p.meta?.hasNextPage;fighterState="ready";}catch{if(token!==fighterSearchToken)return;fighterState="error";}if(page==="fighters"&&!fighterProfileOpen)render();};view.append(form);
+ if(fighterState==="idle"){view.append(emptyBlock("🥊","Find a fighter","Choose a promotion or data source, then enter a fighter name."));return;}
  if(fighterState==="loading"){view.append(el("p","note","Searching fighters…"));return;}
  if(fighterState==="error"){view.append(emptyBlock("⚠️","Search unavailable","Please try again."));return;}
- view.append(el("p","note",fighterResults.length+" matches returned · MMA Calendar · Loaded so far"));
- if(!fighterResults.length)view.append(emptyBlock("🔎","No fighters found","Try a different spelling or surname."));
- const list=el("div","resultlist");for(const f of fighterResults){const row=el("div","item"),info=el("div","");const link=el("button","eventlink",f.name);link.onclick=()=>showFighter(f,null);info.append(link,el("small","",[f.nickname,f.nationality].filter(Boolean).join(" · ")));row.append(info);list.append(row);}view.append(list);moreButton("fighters");
+ const org=fighterSearchOrg;view.append(el("p","note",fighterResults.length+" matches returned · "+(org==="primary"?"MMA Calendar":"Cito · "+fighterSearchSources.find(x=>x[0]===org)[1])));
+ if(fighterSearchTruncated)view.append(el("p","note","First 25 matches shown. Enter a more specific name to narrow results."));
+ if(!fighterResults.length)view.append(emptyBlock("🔎","No fighters found","Try a different spelling, surname or promotion."));
+ const list=el("div","resultlist");for(const f of fighterResults){const row=el("div","item"),info=el("div","");const link=el("button","eventlink",f.name);link.onclick=()=>org==="primary"?showFighter(f,null):showCitoFighter(org,f.slug,f.name,null);info.append(link,el("small","",[f.nickname,f.nationality].filter(Boolean).join(" · ")));row.append(info);list.append(row);}view.append(list);if(org==="primary")moreButton("fighters");
 }
 let fighterProfileOpen=false;
 const rankingCache=new Map();
