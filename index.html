@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101116">
+<title>FightHub — Combat Sports</title>
+<style>
+:root{color-scheme:dark;--bg:#101116;--panel:#191b23;--panel2:#20232d;--line:#303440;--muted:#a4a9b8;--text:#f5f6fa;--accent:#e2a15c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif}header{padding:22px 20px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#101116ee;backdrop-filter:blur(12px);z-index:2}.brand{font-size:25px;font-weight:850;letter-spacing:-1px}.brand span{color:var(--accent)}.tag{color:var(--muted);font-size:12px;margin-top:3px}.wrap{max-width:900px;margin:auto;padding:20px}.hero{padding:24px 20px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,#24232a,#171920)}.eyebrow{color:var(--accent);font-size:11px;font-weight:800;letter-spacing:1.6px}.hero h1{font-size:27px;line-height:1.12;margin:9px 0}.hero p{color:var(--muted);margin:0;line-height:1.5}.tabs{display:flex;gap:8px;overflow:auto;padding:18px 0}.tabs button{border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:10px 14px;border-radius:999px;font-weight:700;white-space:nowrap}.tabs button.active{background:var(--accent);color:#171717;border-color:var(--accent)}.section-head{display:flex;align-items:center;justify-content:space-between;margin:8px 0 12px}.section-head h2{font-size:18px;margin:0}.status{font-size:11px;color:var(--muted);border:1px solid var(--line);padding:5px 8px;border-radius:999px}.empty{padding:25px 18px;border:1px dashed #454957;border-radius:14px;text-align:center;background:#171920}.empty strong{display:block;margin-bottom:7px}.empty p{color:var(--muted);line-height:1.5;margin:0;font-size:13px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px}.tile b{display:block;font-size:14px;margin-bottom:5px}.tile small{color:var(--muted);line-height:1.4}footer{color:#777e8e;text-align:center;font-size:11px;padding:30px 10px}@media(max-width:520px){.wrap{padding:15px}.grid{grid-template-columns:1fr}.hero h1{font-size:24px}}
+</style>
+</head>
+<body>
+<header><div class="brand">FIGHT<span>HUB</span></div><div class="tag">The world of combat sports, in one place</div></header>
+<main class="wrap">
+<section class="hero"><div class="eyebrow">YOUR COMBAT SPORTS HQ</div><h1>Every fight. Every promotion.</h1><p>Follow MMA, boxing, kickboxing, Muay Thai and bare-knuckle events around the world.</p></section>
+<nav class="tabs" aria-label="Main navigation">
+<button class="active" data-tab="events">Events</button><button data-tab="results">Results</button><button data-tab="fighters">Fighters</button><button data-tab="odds">Odds centre</button>
+</nav>
+<section id="content"><div class="section-head"><h2>Upcoming events</h2><span class="status">DATA SETUP PENDING</span></div><div class="empty"><strong>Fight schedules are being connected</strong><p>Event cards and start times will appear here once verified data sources are connected. No made-up fixtures or odds.</p></div><div class="grid"><div class="tile"><b>🌍 Worldwide coverage</b><small>UFC, major and independent MMA, boxing, kickboxing, Muay Thai and bare-knuckle.</small></div><div class="tile"><b>📊 UK odds focus</b><small>Compare bookmaker prices and track meaningful movement when feeds are available.</small></div><div class="tile"><b>🥊 Fighter profiles</b><small>Records, recent form, styles and matchup breakdowns.</small></div><div class="tile"><b>🔔 Follow & alerts</b><small>Save fighters and events, with reminders and odds alerts planned.</small></div></div></section>
+</main><footer>FightHub · Early build · Event and odds feeds not yet connected</footer>
+<script>
+const panels={
+events:['Upcoming events','Fight schedules are being connected','Event cards and start times will appear here once verified data sources are connected. No made-up fixtures or odds.'],
+results:['Recent results','Results archive is being prepared','Verified winners, methods, rounds and finish times will appear here when results data is connected.'],
+fighters:['Fighter directory','Fighter profiles are being prepared','Searchable profiles, records, recent form and matchup comparisons will appear here when fighter data is connected.'],
+odds:['Odds centre','Odds feeds are not connected yet','UK bookmaker odds, comparisons, implied probabilities and price movement will appear here once a reliable odds source is connected.']
+};
+document.querySelectorAll('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===btn));const p=panels[btn.dataset.tab];document.querySelector('#content').innerHTML='<div class="section-head"><h2>'+p[0]+'</h2><span class="status">DATA SETUP PENDING</span></div><div class="empty"><strong>'+p[1]+'</strong><p>'+p[2]+'</p></div>'; }));
+</script>
+</body></html>
