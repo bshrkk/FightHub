@@ -31,7 +31,7 @@
 <div class="tools"><input id="search" type="search" placeholder="Search this section…" aria-label="Search this section"><select id="sport" aria-label="Filter sport"><option value="">All combat sports</option><option>MMA</option><option>Boxing</option><option>Kickboxing</option><option>Muay Thai</option><option>Bare-knuckle</option></select></div>
 <section id="view" aria-live="polite"></section>
 <div class="note">FightHub is an information and research platform. Odds are for comparison only; no bets are placed. Always check the bookmaker for current prices and terms.</div>
-<footer class="foot">FIGHTHUB · EARLY BUILD<br>Upcoming schedules supplied by MMA Calendar. Results, fighter databases and bookmaker feeds are not connected yet.</footer>
+<footer class="foot">FIGHTHUB · EARLY BUILD<br>Upcoming schedules supplied by MMA Calendar. Fighter profiles supplied by MMA Calendar. Results and bookmaker feeds are not connected yet.</footer>
 </main>
 <script>
 const promotionData = [
@@ -89,7 +89,7 @@ view.append(el("p","note",matches.length+" events · UK local times · MMA Calen
 if(!matches.length)view.append(emptyBlock("🔎","No matching events","Try another search or sport filter."));
 const list=el("div","resultlist");
 matches.forEach(e=>{const row=el("div","item"),info=el("div","");const open=el("button","eventlink",e.title);open.type="button";open.disabled=!e.slug;open.addEventListener("click",()=>showEvent(e));info.append(open,el("small","",(e.org||"").toUpperCase()+" · "+(sportNames[e.sport]||e.sport||"Combat sports")),el("small","","Starts: "+ukTime(e.starts_at)));if(e.main_card_at)info.append(el("small","","Main card: "+ukTime(e.main_card_at)));const save=el("button","btn","☆ Save");save.addEventListener("click",()=>addSave(e.title,"Event",sportNames[e.sport]||e.sport));row.append(info,save);list.append(row);});view.append(list);}
-async function loadEvents(){try{const response=await fetch(eventURL);if(!response.ok)throw Error("Feed unavailable");const payload=await response.json();if(!Array.isArray(payload.data))throw Error("Invalid feed");events=payload.data.filter(e=>e&&typeof e.title==="string").sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));eventState="ready";}catch(e){eventState="error";}if(page==="events")render();}
+async function loadEvents(){try{const response=await fetch(eventURL+"events");if(!response.ok)throw Error("Feed unavailable");const payload=await response.json();if(!Array.isArray(payload.data))throw Error("Invalid feed");events=payload.data.filter(e=>e&&typeof e.title==="string").sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));eventState="ready";}catch(e){eventState="error";}if(page==="events")render();}
 
 
 let selectedEvent=null, detailToken=0;
@@ -113,9 +113,34 @@ async function showEvent(e){
  const groups=[["main","Main card"],["prelims","Prelims"],["early_prelims","Early prelims"],["other","Other announced bouts"]];
  const section=b=>{const x=String(b.card_section||"").toLowerCase().replace(/[- ]/g,"_");return x==="main"||x==="main_card"?"main":x==="prelim"||x==="prelims"?"prelims":x==="early_prelim"||x==="early_prelims"?"early_prelims":"other";};
  if(!card.length)wrap.append(emptyBlock("🥊","Fight card not available","No bouts have been supplied for this event yet."));
- for(const [key,label] of groups){const bouts=card.filter(b=>section(b)===key).sort((a,b)=>(a.ordering??999)-(b.ordering??999));if(!bouts.length)continue;wrap.append(el("h3","",label));for(const b of bouts){const row=el("article","fightrow");row.append(el("div","fightmeta",[b.is_main?"MAIN EVENT":null,b.is_title?"TITLE FIGHT":null,b.weight_class,b.scheduled_rounds?b.scheduled_rounds+" rounds":null].filter(Boolean).join(" · ")));for(const [i,f] of [b.fighter_a,b.fighter_b].entries()){if(i)row.append(el("div","note","VS"));row.append(el("strong","",f?.name||"Opponent TBC"));const meta=[f?.nickname,f?.nationality].filter(Boolean).join(" · ");if(meta)row.append(el("small","",meta));}wrap.append(row);}}
- wrap.append(el("p","note","Source: MMA Calendar · Fight cards subject to change. Fighter portraits and records are not connected."));
+ for(const [key,label] of groups){const bouts=card.filter(b=>section(b)===key).sort((a,b)=>(a.ordering??999)-(b.ordering??999));if(!bouts.length)continue;wrap.append(el("h3","",label));for(const b of bouts){const row=el("article","fightrow");row.append(el("div","fightmeta",[b.is_main?"MAIN EVENT":null,b.is_title?"TITLE FIGHT":null,b.weight_class,b.scheduled_rounds?b.scheduled_rounds+" rounds":null].filter(Boolean).join(" · ")));for(const [i,f] of [b.fighter_a,b.fighter_b].entries()){if(i)row.append(el("div","note","VS"));if(f?.slug){const link=el("button","eventlink",f.name||"Fighter");link.onclick=()=>showFighter(f,e);row.append(link);}else row.append(el("strong","",f?.name||"Opponent TBC"));const meta=[f?.nickname,f?.nationality].filter(Boolean).join(" · ");if(meta)row.append(el("small","",meta));}wrap.append(row);}}
+ wrap.append(el("p","note","Source: MMA Calendar · Fight cards subject to change. Tap a fighter name to view their profile."));
  }catch(err){if(token!==detailToken||selectedEvent!==e)return;wrap.replaceChildren(el("h2","",e.title),emptyBlock("⚠️","Fight card unavailable","Try again later. The provider may have reached its request limit."));const retry=el("button","btn","Retry");retry.onclick=()=>showEvent(e);wrap.append(retry);}
+}
+
+
+const fighterCache=new Map();
+async function showFighter(f,e){
+ const token=++detailToken;view.replaceChildren();
+ const back=el("button","btn","← Back to fight card");back.onclick=()=>showEvent(e);view.append(back);
+ const wrap=el("div","eventdetail");view.append(wrap);wrap.append(el("h2","",f.name),el("p","note","Loading fighter profile…"));
+ view.scrollIntoView({block:"start"});
+ try{
+ let d=fighterCache.get(f.slug);
+ if(!d){const res=await fetch(eventURL+"fighters/"+encodeURIComponent(f.slug));if(!res.ok)throw Error("Unavailable");d=(await res.json()).data;if(!d||!d.name)throw Error("Invalid profile");fighterCache.set(f.slug,d);}
+ if(token!==detailToken)return;
+ wrap.replaceChildren(el("h2","",d.name),el("p","note",[d.nickname,d.nationality].filter(Boolean).join(" · ")));
+ const facts=el("div","cards");
+ const add=(parent,label,value)=>{if(value===null||value===undefined||value==="")return;const c=el("article","card");c.append(el("p","",label),el("b","",String(value)));parent.append(c);};
+ add(facts,"Height",d.height_inches!=null?Math.floor(d.height_inches/12)+" ft "+d.height_inches%12+" in":null);
+ add(facts,"Reach",d.reach_inches!=null?d.reach_inches+" in":null);add(facts,"Weight",d.weight_lbs!=null?d.weight_lbs+" lbs":null);add(facts,"Team",d.team);add(facts,"Stance",d.stance);add(facts,"Date of birth",d.dob);wrap.append(facts);
+ const records=el("div","cards");const labels={amateur_mma:"Amateur MMA",bkfc:"BKFC",pro_boxing:"Professional boxing",pro_knuckle:"Professional bare-knuckle",pro_mma:"Professional MMA"};
+ for(const [k,v] of Object.entries(d.records||{}))if(v&&typeof v==="object")add(records,labels[k]||k.replace(/_/g," "),v.value??[v.wins,v.losses,v.draws].join("–"));
+ if(records.children.length)wrap.append(el("h3","","Career records"),records);
+ const stats=el("div","cards");const st=d.stats||{};for(const [k,label] of Object.entries({slpm:"Significant strikes landed/min",str_acc:"Striking accuracy",sapm:"Significant strikes absorbed/min",str_def:"Striking defence",td_avg:"Takedown average",td_acc:"Takedown accuracy",td_def:"Takedown defence",sub_avg:"Submission average"}))add(stats,label,st[k]);
+ if(stats.children.length){wrap.append(el("h3","","Performance statistics"));if(st.basis)wrap.append(el("p","note",[st.basis.scope,st.basis.bouts!=null?st.basis.bouts+" bouts":null].filter(Boolean).join(" · ")));wrap.append(stats);}
+ const save=el("button","btn","☆ Save fighter");save.onclick=()=>{if(!saved.some(x=>x.name===d.name&&x.type==="Fighter")){saved.push({name:d.name,type:"Fighter",category:d.nationality||"Combat sports"});persist();}save.textContent="★ Saved";};wrap.append(save,el("p","note","Source: MMA Calendar · Records are separated by discipline and may overlap. Photos and fight history are not yet integrated."));
+ }catch(err){if(token!==detailToken)return;wrap.replaceChildren(el("h2","",f.name),emptyBlock("⚠️","Profile unavailable","Try again later. The provider may have reached its request limit."));const retry=el("button","btn","Retry");retry.onclick=()=>showFighter(f,e);wrap.append(retry);}
 }
 
 function render(){selectedEvent=null;++detailToken;view.replaceChildren();const p=pages[page];const heading=el("div","heading");heading.append(el("h2","",p.title),el("span","pill",page==="events"?(eventState==="ready"?"EVENT FEED":eventState==="loading"?"LOADING":"UNAVAILABLE"):page==="promotions"?"STARTER DIRECTORY":"LIVE DATA NOT CONNECTED"));view.append(heading);
