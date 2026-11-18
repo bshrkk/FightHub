@@ -53,6 +53,20 @@ const promotionData = [
 {name:"Queensberry Promotions",sport:"Boxing",kind:"Professional boxing promoter"},
 {name:"Top Rank",sport:"Boxing",kind:"Professional boxing promoter"}
 ];
+promotionData.push(
+{name:"ARES FC",sport:"MMA",kind:"French MMA promotion"},
+{name:"FNC",sport:"MMA",kind:"European MMA promotion"},
+{name:"Invicta FC",sport:"MMA",kind:"Women's MMA promotion"},
+{name:"Pancrase",sport:"MMA",kind:"Japanese MMA promotion"},
+{name:"Shooto",sport:"MMA",kind:"MMA promotion"},
+{name:"Misfits Boxing",sport:"Boxing",kind:"Crossover boxing promotion"},
+{name:"Zuffa Boxing",sport:"Boxing",kind:"Boxing promotion"},
+{name:"Golden Boy Promotions",sport:"Boxing",kind:"Boxing promoter"},
+{name:"Rajadamnern World Series",sport:"Muay Thai",kind:"Muay Thai promotion"},
+{name:"Thai Fight",sport:"Muay Thai",kind:"Muay Thai promotion"},
+{name:"RISE",sport:"Kickboxing",kind:"Japanese kickboxing promotion"},
+{name:"BYB Extreme",sport:"Bare-knuckle",kind:"Bare-knuckle promotion"}
+);
 const pages = {
 events:{title:"Upcoming events",icon:"🗓️",headline:"Event listings are ready for verified data",body:"No live event schedule is connected yet. FightHub will only show dates, venues and bout cards when they can be checked against a reliable source."},
 results:{title:"Recent results",icon:"🏆",headline:"Results archive awaiting a verified feed",body:"Results will include winners, method, round and finish time. No results are fabricated for this early build."},
@@ -76,7 +90,24 @@ const form=el("form","formrow");const name=el("input","field");name.placeholder=
 const type=el("select","field");type.setAttribute("aria-label","Item type");["Fighter","Event","Promotion"].forEach(v=>{const o=el("option","",v);o.value=v;type.append(o);});
 const add=el("button","btn primary","Add to saved");add.type="submit";form.append(name,type,add);form.addEventListener("submit",e=>{e.preventDefault();addSave(name.value,type.value,"Added by you");});wrap.append(form);
 const list=el("div","resultlist");saved.forEach((item,i)=>{const row=el("div","item");const info=el("div","");info.append(el("strong","",item.name),el("small","",item.type+" · "+item.category));const remove=el("button","remove","Remove");remove.type="button";remove.addEventListener("click",()=>{saved.splice(i,1);persist();render();});row.append(info,remove);list.append(row);});wrap.append(list);view.append(wrap);}
-function renderPromotions(){const q=search.value.trim().toLowerCase(),selected=sport.value;const matches=promotionData.filter(p=>(!q||(p.name+" "+p.kind+" "+p.sport).toLowerCase().includes(q))&&(!selected||p.sport===selected));const list=el("div","resultlist");if(!matches.length)list.append(emptyBlock("🔎","No matching promotions","Try another search or sport filter."));matches.forEach(p=>{const row=el("div","item");const info=el("div","");info.append(el("strong","",p.name),el("small","",p.sport+" · "+p.kind));const save=el("button","btn","☆ Save");save.type="button";save.addEventListener("click",()=>addSave(p.name,"Promotion",p.sport));row.append(info,save);list.append(row);});view.append(list);}
+function renderPromotions(){
+const q=search.value.trim().toLowerCase(),selected=sport.value;
+const matches=promotionData.filter(p=>(!q||(p.name+" "+p.kind+" "+p.sport).toLowerCase().includes(q))&&(!selected||p.sport===selected||(p.name==="ONE Championship"&&["Kickboxing","Muay Thai"].includes(selected))));
+const list=el("div","resultlist");if(!matches.length)list.append(emptyBlock("🔎","No matching promotions","Try another search or sport filter."));
+matches.forEach(p=>{const row=el("div","item"),info=el("div","");const open=el("button","eventlink",p.name);open.onclick=()=>showPromotion(p);info.append(open,el("small","",p.sport+" · "+p.kind));const save=el("button","btn","☆ Follow");save.onclick=()=>addSave(p.name,"Promotion",p.sport);row.append(info,save);list.append(row);});view.append(list);}
+function showPromotion(p){
+const token=++detailToken;view.replaceChildren();const back=el("button","btn","← All promotions");back.onclick=render;view.append(back,el("h2","",p.name),el("p","note",p.kind));
+const norm=x=>String(x||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+const aliases={"ONE Championship":["one","onechampionship"],"Cage Warriors":["cw","cagewarriors"],"OKTAGON MMA":["oktagon","oktagonmma"],"Matchroom Boxing":["matchroom","matchroomboxing"],"Queensberry Promotions":["queensberry","queensberrypromotions"]};
+const keys=aliases[p.name]||[norm(p.name)];
+for(const [title,items,state] of [["Upcoming events",events,eventState],["Recent results",results,resultState]]){
+view.append(el("h3","",title));const matches=items.filter(e=>keys.includes(norm(e.org)));
+if(!matches.length)view.append(el("p","note",state==="ready"?"No matching events in the currently loaded feed.":"Feed not available yet."));
+for(const e of matches){const row=el("div","item"),info=el("div","");const link=el("button","eventlink",e.title);link.onclick=()=>{page=title==="Recent results"?"results":"events";document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===page));showEvent(e);};info.append(link,el("small","","Starts: "+ukTime(e.starts_at)));row.append(info);view.append(row);}
+}
+view.append(el("p","note","Source: MMA Calendar. First page of each feed only; directory inclusion does not guarantee event coverage."));
+const follow=el("button","btn","☆ Follow promotion");follow.onclick=()=>{if(!saved.some(x=>x.name===p.name&&x.type==="Promotion")){saved.push({name:p.name,type:"Promotion",category:p.sport});persist();}follow.textContent="★ Following";};view.append(follow);
+}
 const eventURL="https://sweet-forest-a1c4.bensharkey4.workers.dev/";
 let events=[], eventState="loading", results=[], resultState="loading";
 const sportNames={"mma":"MMA","boxing":"Boxing","kickboxing":"Kickboxing","muay-thai":"Muay Thai","bare-knuckle-boxing":"Bare-knuckle"};
