@@ -121,11 +121,12 @@ const norm=x=>String(x||"").toLowerCase().replace(/[^a-z0-9]/g,"");
 const aliases={"ONE Championship":["one","onechampionship"],"Cage Warriors":["cw","cagewarriors"],"OKTAGON MMA":["oktagon","oktagonmma"],"Matchroom Boxing":["matchroom","matchroomboxing"],"Queensberry Promotions":["queensberry","queensberrypromotions"]};
 const keys=aliases[p.name]||[norm(p.name)];
 let feeds=[["Upcoming events",events,eventState],["Recent results",results,resultState]];
-if(p.name==="RIZIN"){
- const loading=el("p","note","Loading dedicated RIZIN feeds…");view.append(loading);
+const dedicatedOrg=({"UFC":"ufc","PFL":"pfl","OKTAGON MMA":"oktagon","BKFC":"bkfc","RIZIN":"rizin"})[p.name];
+if(dedicatedOrg){
+ const loading=el("p","note","Loading dedicated "+p.name+" feeds…");view.append(loading);
  feeds=await Promise.all(["upcoming","completed"].map(async status=>{
  const title=status==="completed"?"Recent results":"Upcoming events";
- try{const res=await fetch(eventURL+"events?org=rizin&status="+status);if(!res.ok)throw Error("Unavailable");const payload=await res.json();if(!Array.isArray(payload.data))throw Error("Invalid feed");const rows=payload.data.filter(e=>e.org==="rizin"&&e.slug&&e.title&&(status!=="completed"||e.status==="completed"));return [title,rows,"ready"];}catch{return [title,[], "error"];}
+ try{const res=await fetch(eventURL+"events?org="+encodeURIComponent(dedicatedOrg)+"&status="+status);if(!res.ok)throw Error("Unavailable");const payload=await res.json();if(!Array.isArray(payload.data))throw Error("Invalid feed");const rows=payload.data.filter(e=>e.org===dedicatedOrg&&e.slug&&e.title&&(status!=="completed"||e.status==="completed"));return [title,rows,"ready"];}catch{return [title,[], "error"];}
  }));
  if(token!==detailToken||!loading.isConnected)return;loading.remove();
 }
@@ -134,7 +135,7 @@ view.append(el("h3","",title));const matches=items.filter(e=>keys.includes(norm(
 if(!matches.length)view.append(el("p","note",state==="ready"?"No matching events in the currently loaded feed.":"Feed not available yet."));
 for(const e of matches){const row=el("div","item"),info=el("div","");const link=el("button","eventlink",e.title);link.onclick=()=>{page=title==="Recent results"?"results":"events";document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x.dataset.page===page));showEvent(e);};info.append(link,el("small","",(title==="Recent results"?"Date: ":"Starts: ")+eventTime(e)));row.append(info);view.append(row);}
 }
-view.append(el("p","note",p.name==="RIZIN"?"Source: MMA Calendar · Dedicated RIZIN feed · Up to 25 events per list.":"Sources: MMA Calendar and Cito. Loaded events only; directory inclusion does not guarantee coverage."));
+view.append(el("p","note",dedicatedOrg?"Source: MMA Calendar · Dedicated "+p.name+" feed · Up to 25 events per list.":"Sources: MMA Calendar and Cito. Loaded events only; directory inclusion does not guarantee coverage."));
 const follow=el("button","btn","☆ Follow promotion");follow.onclick=()=>{if(!saved.some(x=>x.name===p.name&&x.type==="Promotion")){saved.push({name:p.name,type:"Promotion",category:p.sport});persist();}follow.textContent="★ Following";};view.append(follow);
 }
 const eventURL="https://sweet-forest-a1c4.bensharkey4.workers.dev/";
