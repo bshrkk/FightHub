@@ -21,7 +21,7 @@
 .resultlist{margin-top:14px}.note{color:var(--muted);font-size:12px;line-height:1.5;margin-top:14px}.foot{color:#737b8a;text-align:center;font-size:11px;line-height:1.6;padding:30px 0}
 @media(max-width:600px){.cards{grid-template-columns:1fr}.shell{padding:16px 14px 40px}.hero{padding:21px}.top{padding:13px 16px}}
 .eventlink{display:block;text-align:left;background:none;border:0;padding:0;color:var(--text);font-weight:800;font-size:16px;text-decoration:underline;text-decoration-color:var(--gold);text-underline-offset:4px}.fightrow{margin:10px 0;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}.fightrow strong{display:block;font-size:17px}.fightrow small{color:var(--muted)}.fightmeta{color:var(--gold);font-size:12px;margin-bottom:8px}.eventdetail h3{margin-top:24px}.eventdetail .btn{margin:8px 0}.eventdetail .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.eventdetail .card{padding:12px;min-width:0;overflow-wrap:anywhere}.eventdetail .card b{margin:4px 0 0}.eventdetail .card p{font-size:12px}
-</style></head>
+.comparetable{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:12px 0}.comparerow{display:grid;grid-template-columns:minmax(0,1fr) repeat(2,minmax(0,1fr));gap:8px;padding:12px 8px;border-bottom:1px solid var(--line);align-items:start;overflow-wrap:anywhere;font-size:12px}.comparerow:last-child{border:0}.comparerow>span{color:var(--muted)}.comparehead{background:var(--panel2)}.comparehead button{font-size:13px;white-space:normal}.comparerow p{margin:0 0 8px}</style></head>
 <body>
 <header class="top"><div class="brand">FIGHT<span>HUB</span></div><div class="sub">The world of combat sports</div></header>
 <main class="shell">
@@ -114,13 +114,41 @@ async function showEvent(e){
  const groups=[["main","Main card"],["prelims","Prelims"],["early_prelims","Early prelims"],["other","Other announced bouts"]];
  const section=b=>{const x=String(b.card_section||"").toLowerCase().replace(/[- ]/g,"_");return x==="main"||x==="main_card"?"main":x==="prelim"||x==="prelims"?"prelims":x==="early_prelim"||x==="early_prelims"?"early_prelims":"other";};
  if(!card.length)wrap.append(emptyBlock("🥊","Fight card not available","No bouts have been supplied for this event yet."));
- for(const [key,label] of groups){const bouts=card.filter(b=>section(b)===key).sort((a,b)=>(a.ordering??999)-(b.ordering??999));if(!bouts.length)continue;wrap.append(el("h3","",label));for(const b of bouts){const row=el("article","fightrow");row.append(el("div","fightmeta",[b.is_main?"MAIN EVENT":null,b.is_title?"TITLE FIGHT":null,b.weight_class,b.scheduled_rounds?b.scheduled_rounds+" rounds":null].filter(Boolean).join(" · ")));for(const [i,f] of [b.fighter_a,b.fighter_b].entries()){if(i)row.append(el("div","note","VS"));if(f?.slug){const link=el("button","eventlink",f.name||"Fighter");link.onclick=()=>showFighter(f,e);row.append(link);}else row.append(el("strong","",f?.name||"Opponent TBC"));const meta=[f?.nickname,f?.nationality].filter(Boolean).join(" · ");if(meta)row.append(el("small","",meta));}wrap.append(row);}}
+ for(const [key,label] of groups){const bouts=card.filter(b=>section(b)===key).sort((a,b)=>(a.ordering??999)-(b.ordering??999));if(!bouts.length)continue;wrap.append(el("h3","",label));for(const b of bouts){const row=el("article","fightrow");row.append(el("div","fightmeta",[b.is_main?"MAIN EVENT":null,b.is_title?"TITLE FIGHT":null,b.weight_class,b.scheduled_rounds?b.scheduled_rounds+" rounds":null].filter(Boolean).join(" · ")));for(const [i,f] of [b.fighter_a,b.fighter_b].entries()){if(i)row.append(el("div","note","VS"));if(f?.slug){const link=el("button","eventlink",f.name||"Fighter");link.onclick=()=>showFighter(f,e);row.append(link);}else row.append(el("strong","",f?.name||"Opponent TBC"));const meta=[f?.nickname,f?.nationality].filter(Boolean).join(" · ");if(meta)row.append(el("small","",meta));}if(b.fighter_a?.slug&&b.fighter_b?.slug){const compare=el("button","btn","Compare fighters");compare.style.display="block";compare.onclick=()=>showComparison(b,e);row.append(compare);}wrap.append(row);}}
  wrap.append(el("p","note","Source: MMA Calendar · Fight cards subject to change. Tap a fighter name to view their profile."));
  }catch(err){if(token!==detailToken||selectedEvent!==e)return;wrap.replaceChildren(el("h2","",e.title),emptyBlock("⚠️","Fight card unavailable","Try again later. The provider may have reached its request limit."));const retry=el("button","btn","Retry");retry.onclick=()=>showEvent(e);wrap.append(retry);}
 }
 
 
 const fighterCache=new Map();
+async function showComparison(b,e){
+ const token=++detailToken;view.replaceChildren();
+ const back=el("button","btn","← Back to fight card");back.onclick=()=>showEvent(e);view.append(back);
+ const wrap=el("div","eventdetail");view.append(wrap);wrap.append(el("h2","","Fighter comparison"),el("p","note","Loading both profiles…"));view.scrollIntoView({block:"start"});
+ const fighters=[b.fighter_a,b.fighter_b];
+ async function profile(f){let d=fighterCache.get(f.slug);if(!d){const res=await fetch(eventURL+"fighters/"+encodeURIComponent(f.slug));if(!res.ok)throw Error("Profile unavailable");d=(await res.json()).data;if(!d?.name)throw Error("Invalid profile");fighterCache.set(f.slug,d);}return d;}
+ const settled=await Promise.allSettled(fighters.map(profile));if(token!==detailToken)return;
+ const ds=settled.map(x=>x.status==="fulfilled"?x.value:null);
+ wrap.replaceChildren(el("h2","","Fighter comparison"),el("p","note",[b.weight_class,sportNames[b.sport]||b.sport].filter(Boolean).join(" · ")));
+ const table=el("div","comparetable");wrap.append(table);
+ const header=el("div","comparerow comparehead");header.append(el("span","","Fighter"));fighters.forEach((f,i)=>{const link=el("button","eventlink",ds[i]?.name||f.name);link.onclick=()=>showFighter(f,e);header.append(link);});table.append(header);
+ const add=(label,values)=>{const row=el("div","comparerow");row.append(el("span","",label),...values.map(v=>el("strong","",v==null||v===""?"—":String(v))));table.append(row);};
+ const both=fn=>ds.map(d=>d?fn(d):null);
+ add("Nationality",both(d=>d.nationality));add("Height",both(d=>d.height_inches!=null?Math.floor(d.height_inches/12)+" ft "+d.height_inches%12+" in":null));add("Reach",both(d=>d.reach_inches!=null?d.reach_inches+" in":null));add("Weight",both(d=>d.weight_lbs!=null?d.weight_lbs+" lbs":null));add("Stance",both(d=>d.stance));add("Team",both(d=>d.team));
+ const keys=new Set(ds.flatMap(d=>Object.keys(d?.records||{})));const labels={amateur_mma:"Amateur MMA",bkfc:"BKFC",pro_boxing:"Pro boxing",pro_knuckle:"Pro bare-knuckle",pro_mma:"Pro MMA"};
+ for(const k of keys)add(labels[k]||k.replace(/_/g," "),both(d=>d.records?.[k]?.value));
+ wrap.append(el("h3","","Performance statistics"));
+ const stats=el("div","comparetable");wrap.append(stats);
+ const scope=d=>d?.stats?.basis?.scope||null;
+ const statRow=(label,values)=>{const row=el("div","comparerow");row.append(el("span","",label),...values.map(v=>el("strong","",v==null||v===""?"—":String(v))));stats.append(row);};
+ statRow("Stats scope",both(scope));statRow("Bouts sampled",both(d=>d.stats?.basis?.bouts));
+ if(scope(ds[0])&&scope(ds[1])&&scope(ds[0])===scope(ds[1])){for(const [k,label] of Object.entries({slpm:"Strikes landed/min",str_acc:"Striking accuracy",sapm:"Strikes absorbed/min",str_def:"Striking defence",td_avg:"Takedown average",td_acc:"Takedown accuracy",td_def:"Takedown defence",sub_avg:"Submission average"}))statRow(label,both(d=>d.stats?.[k]));}else wrap.append(el("p","note","Comparable statistics unavailable: both profiles must report the same discipline scope."));
+ wrap.append(el("h3","","Recent form"));const form=el("div","comparetable");wrap.append(form);const loading=el("p","note","Loading recent completed fights…");wrap.append(loading);
+ const histories=await Promise.allSettled(fighters.map(async f=>{const res=await fetch(eventURL+"fighters/"+encodeURIComponent(f.slug)+"/history");if(!res.ok)throw Error("Unavailable");const p=await res.json();if(!Array.isArray(p.data))throw Error("Invalid history");const aliases={"bare-knuckle-boxing":"knuckle","bare-knuckle":"knuckle","pro-knuckle":"knuckle"};const norm=x=>aliases[x]||x;const seen=new Set();return p.data.filter(x=>x&&["win","loss","draw","nc","no contest","no_contest","w","l","d"].includes(String(x.result).toLowerCase())&&(!b.sport||norm(x.sport)===norm(b.sport))&&x.competition_level!=="amateur").sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).filter(x=>{const key=[x.date,String(x.opponent_name||x.opponent?.name||"").toLowerCase()].join("|");if(seen.has(key))return false;seen.add(key);return true;}).slice(0,5);}));
+ if(token!==detailToken)return;loading.remove();const fr=el("div","comparerow");fr.append(el("span","","Last five in bout discipline"));histories.forEach(h=>{const col=el("div","");if(h.status!=="fulfilled"||!h.value.length)col.append(el("span","note","Unavailable"));else h.value.forEach(x=>{const result=String(x.result).toUpperCase();const line=el("p","",result+" · "+(x.opponent_name||x.opponent?.name||"Unknown"));line.style.color=["WIN","W"].includes(result)?"var(--green)":["LOSS","L"].includes(result)?"#ef9999":"var(--muted)";col.append(line);});fr.append(col);});form.append(fr);
+ wrap.append(el("p","note","Source: MMA Calendar. — means not supplied. Records may overlap across disciplines; recent form is limited to available matching professional fight entries. Statistics are descriptive, not predictions."));
+ if(ds.some(d=>!d)){const retry=el("button","btn","Retry comparison");retry.onclick=()=>showComparison(b,e);wrap.append(retry);}
+}
 async function showFighter(f,e){
  const token=++detailToken;view.replaceChildren();
  const back=el("button","btn","← Back to fight card");back.onclick=()=>showEvent(e);view.append(back);
