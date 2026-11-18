@@ -32,7 +32,7 @@
 <div class="tools"><input id="search" type="search" placeholder="Search this section…" aria-label="Search this section"><select id="sport" aria-label="Filter sport"><option value="">All combat sports</option><option>MMA</option><option>Boxing</option><option>Kickboxing</option><option>Muay Thai</option><option>Bare-knuckle</option></select></div>
 <section id="view" aria-live="polite"></section>
 <div class="note">FightHub is an information and research platform. Odds are for comparison only; no bets are placed. Always check the bookmaker for current prices and terms.</div>
-<footer class="foot">FIGHTHUB · EARLY BUILD<br>Upcoming schedules supplied by MMA Calendar. Fighter profiles supplied by MMA Calendar. Results and bookmaker feeds are not connected yet.</footer>
+<footer class="foot">FIGHTHUB · EARLY BUILD<br>Upcoming schedules supplied by MMA Calendar. Fighter profiles supplied by MMA Calendar. Results supplied by MMA Calendar when available. Bookmaker feeds are not connected yet.</footer>
 </main>
 <script>
 const promotionData = [
@@ -78,18 +78,21 @@ const add=el("button","btn primary","Add to saved");add.type="submit";form.appen
 const list=el("div","resultlist");saved.forEach((item,i)=>{const row=el("div","item");const info=el("div","");info.append(el("strong","",item.name),el("small","",item.type+" · "+item.category));const remove=el("button","remove","Remove");remove.type="button";remove.addEventListener("click",()=>{saved.splice(i,1);persist();render();});row.append(info,remove);list.append(row);});wrap.append(list);view.append(wrap);}
 function renderPromotions(){const q=search.value.trim().toLowerCase(),selected=sport.value;const matches=promotionData.filter(p=>(!q||(p.name+" "+p.kind+" "+p.sport).toLowerCase().includes(q))&&(!selected||p.sport===selected));const list=el("div","resultlist");if(!matches.length)list.append(emptyBlock("🔎","No matching promotions","Try another search or sport filter."));matches.forEach(p=>{const row=el("div","item");const info=el("div","");info.append(el("strong","",p.name),el("small","",p.sport+" · "+p.kind));const save=el("button","btn","☆ Save");save.type="button";save.addEventListener("click",()=>addSave(p.name,"Promotion",p.sport));row.append(info,save);list.append(row);});view.append(list);}
 const eventURL="https://sweet-forest-a1c4.bensharkey4.workers.dev/";
-let events=[], eventState="loading";
+let events=[], eventState="loading", results=[], resultState="loading";
 const sportNames={"mma":"MMA","boxing":"Boxing","kickboxing":"Kickboxing","muay-thai":"Muay Thai","bare-knuckle-boxing":"Bare-knuckle"};
 function ukTime(value){if(!value)return "TBC";const d=new Date(value);return Number.isNaN(d.getTime())?"TBC":new Intl.DateTimeFormat("en-GB",{dateStyle:"medium",timeStyle:"short",timeZone:"Europe/London"}).format(d);}
 function renderEvents(){
-if(eventState==="loading"){view.append(emptyBlock("🗓️","Loading upcoming events","Retrieving the event schedule."));return;}
+const isResults=page==="results", eventState=isResults?resultState:globalEventState(), events=isResults?results:globalEvents();
+if(eventState==="loading"){view.append(emptyBlock("🗓️",isResults?"Loading results":"Loading upcoming events",isResults?"Retrieving completed events.":"Retrieving the event schedule."));return;}
 if(eventState==="error"){view.append(emptyBlock("⚠️","Event feed unavailable","Please try again later."));return;}
 const q=search.value.trim().toLowerCase(), selected=sport.value;
 const matches=events.filter(e=>(!selected||sportNames[e.sport]===selected)&&(!q||[e.title,e.org,sportNames[e.sport]].join(" ").toLowerCase().includes(q)));
-view.append(el("p","note",matches.length+" events · UK local times · MMA Calendar feed · First page only; schedules subject to change."));
+view.append(el("p","note",matches.length+" events · UK local times · MMA Calendar feed · First page only"+(isResults?".":"; schedules subject to change.")));
 if(!matches.length)view.append(emptyBlock("🔎","No matching events","Try another search or sport filter."));
 const list=el("div","resultlist");
 matches.forEach(e=>{const row=el("div","item"),info=el("div","");const open=el("button","eventlink",e.title);open.type="button";open.disabled=!e.slug;open.addEventListener("click",()=>showEvent(e));info.append(open,el("small","",(e.org||"").toUpperCase()+" · "+(sportNames[e.sport]||e.sport||"Combat sports")),el("small","","Starts: "+ukTime(e.starts_at)));if(e.main_card_at)info.append(el("small","","Main card: "+ukTime(e.main_card_at)));const save=el("button","btn","☆ Save");save.addEventListener("click",()=>addSave(e.title,"Event",sportNames[e.sport]||e.sport));row.append(info,save);list.append(row);});view.append(list);}
+function globalEventState(){return eventState;} function globalEvents(){return events;}
+async function loadResults(){try{const response=await fetch(eventURL+"results");if(!response.ok)throw Error("Unavailable");const payload=await response.json();if(!Array.isArray(payload.data)||payload.data.some(e=>e.status!=="completed"))throw Error("Invalid completed feed");results=payload.data.filter(e=>e&&typeof e.title==="string").sort((a,b)=>new Date(b.starts_at)-new Date(a.starts_at));resultState="ready";}catch(e){resultState="error";}if(page==="results"&&!selectedEvent)render();}
 async function loadEvents(){try{const response=await fetch(eventURL+"events");if(!response.ok)throw Error("Feed unavailable");const payload=await response.json();if(!Array.isArray(payload.data))throw Error("Invalid feed");events=payload.data.filter(e=>e&&typeof e.title==="string").sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));eventState="ready";}catch(e){eventState="error";}if(page==="events")render();}
 
 
@@ -98,14 +101,14 @@ const detailCache=new Map();
 async function showEvent(e){
  selectedEvent=e;const token=++detailToken;
  view.replaceChildren();
- const back=el("button","btn","← All events");back.onclick=()=>{selectedEvent=null;++detailToken;render();};view.append(back);
+ const back=el("button","btn",page==="results"?"← All results":"← All events");back.onclick=()=>{selectedEvent=null;++detailToken;render();};view.append(back);
  const wrap=el("div","eventdetail");view.append(wrap);
  wrap.append(el("h2","",e.title),el("p","note","Loading fight card…"));
  view.scrollIntoView({block:"start"});
  try{
  let d=detailCache.get(e.slug);
  if(!d){const res=await fetch(eventURL+"events/"+encodeURIComponent(e.slug));if(!res.ok)throw Error("Unavailable");const p=await res.json();d=p.data;if(!d||typeof d!=="object"||Array.isArray(d))throw Error("Invalid event");detailCache.set(e.slug,d);}
- if(token!==detailToken||selectedEvent!==e||page!=="events")return;
+ if(token!==detailToken||selectedEvent!==e||!["events","results"].includes(page))return;
  wrap.replaceChildren(el("h2","",d.title||e.title));
  const v=d.venue||{};const venue=[v.name,v.city,v.region,v.country].filter(Boolean).join(" · ");
  if(venue)wrap.append(el("p","",venue));
@@ -114,7 +117,7 @@ async function showEvent(e){
  const groups=[["main","Main card"],["prelims","Prelims"],["early_prelims","Early prelims"],["other","Other announced bouts"]];
  const section=b=>{const x=String(b.card_section||"").toLowerCase().replace(/[- ]/g,"_");return x==="main"||x==="main_card"?"main":x==="prelim"||x==="prelims"?"prelims":x==="early_prelim"||x==="early_prelims"?"early_prelims":"other";};
  if(!card.length)wrap.append(emptyBlock("🥊","Fight card not available","No bouts have been supplied for this event yet."));
- for(const [key,label] of groups){const bouts=card.filter(b=>section(b)===key).sort((a,b)=>(a.ordering??999)-(b.ordering??999));if(!bouts.length)continue;wrap.append(el("h3","",label));for(const b of bouts){const row=el("article","fightrow");row.append(el("div","fightmeta",[b.is_main?"MAIN EVENT":null,b.is_title?"TITLE FIGHT":null,b.weight_class,b.scheduled_rounds?b.scheduled_rounds+" rounds":null].filter(Boolean).join(" · ")));for(const [i,f] of [b.fighter_a,b.fighter_b].entries()){if(i)row.append(el("div","note","VS"));if(f?.slug){const link=el("button","eventlink",f.name||"Fighter");link.onclick=()=>showFighter(f,e);row.append(link);}else row.append(el("strong","",f?.name||"Opponent TBC"));const meta=[f?.nickname,f?.nationality].filter(Boolean).join(" · ");if(meta)row.append(el("small","",meta));}if(b.fighter_a?.slug&&b.fighter_b?.slug){const compare=el("button","btn","Compare fighters");compare.style.display="block";compare.onclick=()=>showComparison(b,e);row.append(compare);}wrap.append(row);}}
+ for(const [key,label] of groups){const bouts=card.filter(b=>section(b)===key).sort((a,b)=>(a.ordering??999)-(b.ordering??999));if(!bouts.length)continue;wrap.append(el("h3","",label));for(const b of bouts){const row=el("article","fightrow");row.append(el("div","fightmeta",[b.is_main?"MAIN EVENT":null,b.is_title?"TITLE FIGHT":null,b.weight_class,b.scheduled_rounds?b.scheduled_rounds+" rounds":null].filter(Boolean).join(" · ")));for(const [i,f] of [b.fighter_a,b.fighter_b].entries()){if(i)row.append(el("div","note","VS"));if(f?.slug){const link=el("button","eventlink",f.name||"Fighter");link.onclick=()=>showFighter(f,e);row.append(link);}else row.append(el("strong","",f?.name||"Opponent TBC"));const meta=[f?.nickname,f?.nationality].filter(Boolean).join(" · ");if(meta)row.append(el("small","",meta));}if(b.result){const result=b.result;const winner=[b.fighter_a,b.fighter_b].find(f=>f?.id!=null&&String(f.id)===String(result.winner_fighter_id));const label=el("strong","",winner?"Winner: "+winner.name:"Result: "+(result.method||"Winner not supplied"));label.style.color=winner?"var(--green)":"var(--muted)";row.append(label);const details=[result.method,result.round!=null?"Round "+result.round:null,result.time].filter(Boolean).join(" · ");if(details)row.append(el("p","",details));if(result.details)row.append(el("p","note",String(result.details)));if(b.referee)row.append(el("p","note","Referee: "+b.referee));if(b.bonus)row.append(el("p","note","Bonus: "+b.bonus));}if(b.fighter_a?.slug&&b.fighter_b?.slug){const compare=el("button","btn","Compare fighters");compare.style.display="block";compare.onclick=()=>showComparison(b,e);row.append(compare);}wrap.append(row);}}
  wrap.append(el("p","note","Source: MMA Calendar · Fight cards subject to change. Tap a fighter name to view their profile."));
  }catch(err){if(token!==detailToken||selectedEvent!==e)return;wrap.replaceChildren(el("h2","",e.title),emptyBlock("⚠️","Fight card unavailable","Try again later. The provider may have reached its request limit."));const retry=el("button","btn","Retry");retry.onclick=()=>showEvent(e);wrap.append(retry);}
 }
@@ -185,8 +188,8 @@ async function showFighter(f,e){
  }catch(err){if(token!==detailToken)return;wrap.replaceChildren(el("h2","",f.name),emptyBlock("⚠️","Profile unavailable","Try again later. The provider may have reached its request limit."));const retry=el("button","btn","Retry");retry.onclick=()=>showFighter(f,e);wrap.append(retry);}
 }
 
-function render(){selectedEvent=null;++detailToken;view.replaceChildren();const p=pages[page];const heading=el("div","heading");heading.append(el("h2","",p.title),el("span","pill",page==="events"?(eventState==="ready"?"EVENT FEED":eventState==="loading"?"LOADING":"UNAVAILABLE"):page==="promotions"?"STARTER DIRECTORY":"LIVE DATA NOT CONNECTED"));view.append(heading);
-if(page==="events"){renderEvents();return;}
+function render(){selectedEvent=null;++detailToken;view.replaceChildren();const p=pages[page];const heading=el("div","heading");heading.append(el("h2","",p.title),el("span","pill",page==="events"?(eventState==="ready"?"EVENT FEED":eventState==="loading"?"LOADING":"UNAVAILABLE"):page==="results"?(resultState==="ready"?"RESULTS FEED":resultState==="loading"?"LOADING":"UNAVAILABLE"):page==="promotions"?"STARTER DIRECTORY":"LIVE DATA NOT CONNECTED"));view.append(heading);
+if(page==="events"||page==="results"){renderEvents();return;}
 if(page==="saved"){renderSaved();return;}
 if(page==="promotions"){view.append(emptyBlock(p.icon,p.headline,p.body));renderPromotions();return;}
 view.append(emptyBlock(p.icon,p.headline,p.body));
@@ -197,11 +200,12 @@ page==="events"?[["🌐 Worldwide coverage","MMA, boxing, kickboxing, Muay Thai 
 [["🥇 Result details","Winner, method, round and finish time."],["📚 Event archive","Browse completed events by promotion and sport."],["🔎 Find a bout","Search results once the verified archive is connected."],["⭐ Follow fighters","Keep names in your saved list on this device."]];
 features.forEach(([title,body])=>{const c=el("article","card");c.append(el("b","",title),el("p","",body));cards.append(c);});view.append(cards);}
 document.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",()=>{page=b.dataset.page;search.value="";sport.value="";document.querySelectorAll("[data-page]").forEach(x=>x.classList.toggle("active",x===b));render();}));
-search.addEventListener("input",()=>{if(page==="promotions"||page==="events")render();});
-sport.addEventListener("change",()=>{if(page==="promotions"||page==="events")render();});
+search.addEventListener("input",()=>{if(page==="promotions"||page==="events"||page==="results")render();});
+sport.addEventListener("change",()=>{if(page==="promotions"||page==="events"||page==="results")render();});
 document.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",()=>{search.value="";sport.value="";}));
 render();
 loadEvents();
+loadResults();
 if("serviceWorker" in navigator && location.protocol.startsWith("http"))window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
 </script>
 </body></html>
