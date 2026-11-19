@@ -435,8 +435,8 @@ function wikiPortrait(d){
  const key=name.toLowerCase()+"|"+dob;
  if(wikiPortraitCache.has(key))return wikiPortraitCache.get(key);
  const task=wikiPortraitQueue.then(async()=>{
- const s=await wikiPortraitRequest("www.wikidata.org",{action:"wbsearchentities",search:name,language:"en",limit:"5"});
- const ids=(s.search||[]).filter(x=>/^Q\d+$/.test(x.id)).map(x=>x.id);if(!ids.length)return {reason:"No Wikidata search match"};
+ const s=await wikiPortraitRequest("www.wikidata.org",{action:"wbsearchentities",search:name,language:"en",limit:"25"});
+ const ids=[...new Set((s.search||[]).filter(x=>/^Q\d+$/.test(x.id)).map(x=>x.id))];if(!ids.length)return {reason:"No Wikidata search match"};
  const e=await wikiPortraitRequest("www.wikidata.org",{action:"wbgetentities",ids:ids.join("|"),props:"claims|labels|aliases",languages:"en"});
  const norm=x=>String(x||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
  const claims=(x,p)=>(x.claims?.[p]||[]).filter(y=>y.rank!=="deprecated").map(y=>y.mainsnak?.datavalue?.value);
