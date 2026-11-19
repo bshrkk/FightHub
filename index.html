@@ -428,6 +428,18 @@ function fighterPortrait(d){
  const caption=el("figcaption","note","Photograph unavailable");figure.append(caption);
  const safeURL=v=>{try{const u=new URL(v);return u.protocol==="https:"?u.href:null;}catch{return null;}};
  const commonsPhotos={
+"conor-mcgregor":{"file":"Conor McGregor.jpg","artist":"Figure","version":"3.0","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/a/aa/Conor_McGregor.jpg"},
+"michael-chandler":{"file":"Michael Chandler (Cropped).jpg","artist":"Nate Pesce","version":"2.0","sa":false,"direct":"https://upload.wikimedia.org/wikipedia/commons/c/c0/Michael_Chandler_(Cropped).jpg"},
+"amanda-nunes":{"file":"Amanda Nunes.jpg","artist":"מאיר בן חמו","version":"3.0","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/f/fd/Amanda_Nunes.jpg"},
+"justin-gaethje":{"file":"Justin Gaethje.jpg","artist":"Richard Norris","version":"4.0","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/a/a4/Justin_Gaethje.jpg"},
+"georges-st-pierre":{"file":"Georges St-Pierre.jpg","artist":"Bad intentionz","version":"3.0","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/8/85/Georges_St-Pierre.jpg"},
+"anderson-silva":{"file":"Anderson Silva 01.jpg","artist":"tercerojista","version":"2.0","sa":false,"direct":"https://upload.wikimedia.org/wikipedia/commons/1/10/Anderson_Silva_01.jpg"},
+"dustin-poirier":{"file":"DustinPoirier.png","artist":"TheDurandal42","version":"3.0","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/6/6c/DustinPoirier.png"},
+"holly-holm":{"file":"Holly Holm.jpg","artist":"Mike Jackson, Mike The Truth","version":"3.0","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/f/f7/Holly_Holm.jpg"},
+"cris-cyborg":{"file":"Cris Cyborg.jpg","artist":"Stephen McCarthy / Web Summit via Sportsfile","version":"2.0","sa":false,"direct":"https://upload.wikimedia.org/wikipedia/commons/f/f1/Cris_Cyborg.jpg"},
+"miesha-tate":{"file":"Miesha Tate.jpeg","artist":"J_Dacanay","version":"2.0","sa":false,"direct":"https://upload.wikimedia.org/wikipedia/commons/a/a4/Miesha_Tate.jpeg"},
+"alistair-overeem":{"file":"Alistair Overeem.png","artist":"THE REEM","version":"3.0","sa":false,"direct":"https://upload.wikimedia.org/wikipedia/commons/6/63/Alistair_Overeem.png"},
+"jose-aldo":{"file":"José Aldo (30 de dezembro de 2010) (cropped).jpg","artist":"Maddox (cropped by Beastpack)","version":"3.0","sa":false,"direct":"https://upload.wikimedia.org/wikipedia/commons/0/01/Jos%C3%A9_Aldo_(30_de_dezembro_de_2010)_(cropped).jpg"},
 "francis-ngannou":{"file":"Francis Ngannou photo.jpg","artist":"X2o","version":"4.0","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/e/ea/Francis_Ngannou_photo.jpg"},
 "fedor-emelianenko":{"file":"Fedor Emelianenko 2012.jpg","artist":"Dmitry Rozhkov","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/6/61/Fedor_Emelianenko_2012.jpg"},
 "eddie-alvarez":{"file":"Eddie Alvarez.jpg","artist":"Kyle Holdsworth","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/0/06/Eddie_Alvarez.jpg"},
@@ -438,7 +450,7 @@ function fighterPortrait(d){
  "demetrious-johnson":{file:"Demetrious Johnson.jpg",artist:"Kelly Bailey",version:"2.0"}
  };
  const slug=String(d.slug||"").replace(/^cito:[^:]+:/,"");
- const nameKey=String(d.name||"").trim().toLowerCase().replace(/\s+/g,"-");
+ const nameKey=String(d.name||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase().replace(/\s+/g,"-");
  const entry=(Object.hasOwn(commonsPhotos,slug)?commonsPhotos[slug]:null)||(Object.hasOwn(commonsPhotos,nameKey)?commonsPhotos[nameKey]:null);
  const version=entry?.version||"3.0";
  const fallback=entry?{url:entry.direct||"https://commons.wikimedia.org/wiki/Special:FilePath/"+encodeURIComponent(entry.file),artist:entry.artist,license:(entry.sa?"CC BY-SA ":"CC BY ")+version,license_url:"https://creativecommons.org/licenses/"+(entry.sa?"by-sa":"by")+"/"+version+"/",source_page:"https://commons.wikimedia.org/wiki/File:"+encodeURIComponent(entry.file)}:null;
