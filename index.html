@@ -430,15 +430,15 @@ function fighterPortrait(d){
  const commonsPhotos={
  "jon-jones":{file:"Jon Jones Posing.png",artist:"Vengo Films"},
  "daniel-cormier":{file:"Daniel Cormier.png",artist:"9 Seconds"},
- "shinya-aoki":{file:"Shinya Aoki at Evolve MMA in Singapore (cropped).jpg",artist:"Evolve MMA"},
+ "shinya-aoki":{file:"Shinya Aoki at Evolve MMA in Singapore (cropped).jpg",artist:"Evolve MMA",direct:"https://upload.wikimedia.org/wikipedia/commons/1/1d/Shinya_Aoki_at_Evolve_MMA_in_Singapore_%28cropped%29.jpg"},
  "demetrious-johnson":{file:"Demetrious Johnson.jpg",artist:"Kelly Bailey",version:"2.0"}
  };
  const slug=String(d.slug||"").replace(/^cito:[^:]+:/,"");
  const nameKey=String(d.name||"").trim().toLowerCase().replace(/\s+/g,"-");
  const entry=commonsPhotos[slug]||(["shinya-aoki","demetrious-johnson"].includes(nameKey)?commonsPhotos[nameKey]:null);
  const version=entry?.version||"3.0";
- const fallback=entry?{url:"https://commons.wikimedia.org/wiki/Special:FilePath/"+encodeURIComponent(entry.file),artist:entry.artist,license:"CC BY "+version,license_url:"https://creativecommons.org/licenses/by/"+version+"/",source_page:"https://commons.wikimedia.org/wiki/File:"+encodeURIComponent(entry.file)}:null;
- const photo=(Array.isArray(d.images)?d.images:[]).find(x=>x&&safeURL(x.url)&&x.artist&&x.license)||fallback;
+ const fallback=entry?{url:entry.direct||"https://commons.wikimedia.org/wiki/Special:FilePath/"+encodeURIComponent(entry.file),artist:entry.artist,license:"CC BY "+version,license_url:"https://creativecommons.org/licenses/by/"+version+"/",source_page:"https://commons.wikimedia.org/wiki/File:"+encodeURIComponent(entry.file)}:null;
+ const photo=fallback||(Array.isArray(d.images)?d.images:[]).find(x=>x&&safeURL(x.url)&&x.artist&&x.license);
  if(!photo)return figure;
  const img=el("img","");img.alt=d.name;img.decoding="async";img.loading="eager";img.referrerPolicy="no-referrer";img.hidden=true;
  img.onload=()=>{placeholder.hidden=true;img.hidden=false;caption.replaceChildren(document.createTextNode("Photo: "+photo.artist+" · "));const license=safeURL(photo.license_url);if(license){const a=el("a","",photo.license);a.href=license;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}else caption.append(document.createTextNode(photo.license));const source=safeURL(photo.source_page);if(source){const a=el("a",""," · Source");a.href=source;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}};
