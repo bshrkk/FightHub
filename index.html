@@ -429,10 +429,15 @@ function fighterPortrait(d){
  const safeURL=v=>{try{const u=new URL(v);return u.protocol==="https:"?u.href:null;}catch{return null;}};
  const commonsPhotos={
  "jon-jones":{file:"Jon Jones Posing.png",artist:"Vengo Films"},
- "daniel-cormier":{file:"Daniel Cormier.png",artist:"9 Seconds"}
+ "daniel-cormier":{file:"Daniel Cormier.png",artist:"9 Seconds"},
+ "shinya-aoki":{file:"Shinya Aoki at Evolve MMA in Singapore (cropped).jpg",artist:"Evolve MMA"},
+ "demetrious-johnson":{file:"Demetrious Johnson.jpg",artist:"Kelly Bailey",version:"2.0"}
  };
- const entry=commonsPhotos[d.slug];
- const fallback=entry?{url:"https://commons.wikimedia.org/wiki/Special:FilePath/"+encodeURIComponent(entry.file),artist:entry.artist,license:"CC BY 3.0",license_url:"https://creativecommons.org/licenses/by/3.0/",source_page:"https://commons.wikimedia.org/wiki/File:"+encodeURIComponent(entry.file)}:null;
+ const slug=String(d.slug||"").replace(/^cito:[^:]+:/,"");
+ const nameKey=String(d.name||"").trim().toLowerCase().replace(/\s+/g,"-");
+ const entry=commonsPhotos[slug]||(["shinya-aoki","demetrious-johnson"].includes(nameKey)?commonsPhotos[nameKey]:null);
+ const version=entry?.version||"3.0";
+ const fallback=entry?{url:"https://commons.wikimedia.org/wiki/Special:FilePath/"+encodeURIComponent(entry.file),artist:entry.artist,license:"CC BY "+version,license_url:"https://creativecommons.org/licenses/by/"+version+"/",source_page:"https://commons.wikimedia.org/wiki/File:"+encodeURIComponent(entry.file)}:null;
  const photo=(Array.isArray(d.images)?d.images:[]).find(x=>x&&safeURL(x.url)&&x.artist&&x.license)||fallback;
  if(!photo)return figure;
  const img=el("img","");img.alt=d.name;img.decoding="async";img.loading="lazy";img.referrerPolicy="no-referrer";img.hidden=true;
