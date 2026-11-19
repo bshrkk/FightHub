@@ -488,7 +488,8 @@ function fighterPortrait(d,allowLookup=false){
  const entry=(Object.hasOwn(commonsPhotos,slug)?commonsPhotos[slug]:null)||(Object.hasOwn(commonsPhotos,nameKey)?commonsPhotos[nameKey]:null);
  const version=entry?.version||"3.0";
  const fallback=entry?{url:entry.direct||"https://commons.wikimedia.org/wiki/Special:FilePath/"+encodeURIComponent(entry.file),artist:entry.artist,license:(entry.sa?"CC BY-SA ":"CC BY ")+version,license_url:"https://creativecommons.org/licenses/"+(entry.sa?"by-sa":"by")+"/"+version+"/",source_page:"https://commons.wikimedia.org/wiki/File:"+encodeURIComponent(entry.file)}:null;
- const photo=fallback||(Array.isArray(d.images)?d.images:[]).find(x=>x&&safeURL(x.url)&&x.artist&&x.license);
+ const reviewedPhoto=nameKey==="angela-lee"&&String(d.dob||d.dateOfBirth||"").slice(0,10)==="1996-07-08"?{"url":"https://upload.wikimedia.org/wikipedia/commons/4/41/COMLOG_WESTPAC_at_ONE_Championship_Fight_Night_%282%29_%28cropped%29.jpg","artist":"Brandon Parker / U.S. Navy (cropped by TaurusEmerald)","license":"Public domain (U.S. Navy)","license_url":"https://creativecommons.org/publicdomain/mark/1.0/","source_page":"https://commons.wikimedia.org/wiki/File:COMLOG_WESTPAC_at_ONE_Championship_Fight_Night_(2)_(cropped).jpg"}:null;
+ const photo=reviewedPhoto||fallback||(Array.isArray(d.images)?d.images:[]).find(x=>x&&safeURL(x.url)&&x.artist&&x.license);
  const displayPhoto=(photo)=>{
  if(!photo)return;
  const img=el("img","");img.alt=d.name;img.decoding="async";img.loading="eager";img.referrerPolicy="no-referrer";img.hidden=true;
