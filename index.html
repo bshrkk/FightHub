@@ -462,6 +462,9 @@ function fighterPortrait(d,allowLookup=false){
  const caption=el("figcaption","note","Photograph unavailable");figure.append(caption);
  const safeURL=v=>{try{const u=new URL(v);return u.protocol==="https:"?u.href:null;}catch{return null;}};
  const commonsPhotos={
+"fabricio-werdum":{"file":"Fabricio Werdum.jpg","artist":"Mike Dunn (cropped and sharpened by Hit bull, win steak)","version":"2.0","sa":false},
+"wanderlei-silva":{"file":"WanderleiSilva.png","artist":"LeeBrimelow (cropped from original)","version":"2.0","sa":false},
+"gegard-mousasi":{"file":"Gegard Mousasi.jpg","artist":"Michael Dunn (cropped and rotated by Hit bull, win steak)","version":"2.0","sa":false},
 "conor-mcgregor":{"file":"Conor McGregor.jpg","artist":"Figure","version":"3.0","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/a/aa/Conor_McGregor.jpg"},
 "michael-chandler":{"file":"Michael Chandler (Cropped).jpg","artist":"Nate Pesce","version":"2.0","sa":false,"direct":"https://upload.wikimedia.org/wikipedia/commons/c/c0/Michael_Chandler_(Cropped).jpg"},
 "amanda-nunes":{"file":"Amanda Nunes.jpg","artist":"מאיר בן חמו","version":"3.0","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/f/fd/Amanda_Nunes.jpg"},
