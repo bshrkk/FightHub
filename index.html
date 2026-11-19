@@ -428,6 +428,10 @@ function fighterPortrait(d){
  const caption=el("figcaption","note","Photograph unavailable");figure.append(caption);
  const safeURL=v=>{try{const u=new URL(v);return u.protocol==="https:"?u.href:null;}catch{return null;}};
  const commonsPhotos={
+"francis-ngannou":{"file":"Francis Ngannou photo.jpg","artist":"X2o","version":"4.0","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/e/ea/Francis_Ngannou_photo.jpg"},
+"fedor-emelianenko":{"file":"Fedor Emelianenko 2012.jpg","artist":"Dmitry Rozhkov","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/6/61/Fedor_Emelianenko_2012.jpg"},
+"eddie-alvarez":{"file":"Eddie Alvarez.jpg","artist":"Kyle Holdsworth","sa":true,"direct":"https://upload.wikimedia.org/wikipedia/commons/0/06/Eddie_Alvarez.jpg"},
+"ben-askren":{"file":"Ben Askren Nov 2018.jpg","artist":"MMAnytt","direct":"https://upload.wikimedia.org/wikipedia/commons/6/68/Ben_Askren_Nov_2018.jpg"},
  "jon-jones":{file:"Jon Jones Posing.png",artist:"Vengo Films"},
  "daniel-cormier":{file:"Daniel Cormier.png",artist:"9 Seconds"},
  "shinya-aoki":{file:"Shinya Aoki at Evolve MMA in Singapore (cropped).jpg",artist:"Evolve MMA",direct:"https://upload.wikimedia.org/wikipedia/commons/1/1d/Shinya_Aoki_at_Evolve_MMA_in_Singapore_%28cropped%29.jpg"},
@@ -435,9 +439,9 @@ function fighterPortrait(d){
  };
  const slug=String(d.slug||"").replace(/^cito:[^:]+:/,"");
  const nameKey=String(d.name||"").trim().toLowerCase().replace(/\s+/g,"-");
- const entry=commonsPhotos[slug]||(["shinya-aoki","demetrious-johnson"].includes(nameKey)?commonsPhotos[nameKey]:null);
+ const entry=(Object.hasOwn(commonsPhotos,slug)?commonsPhotos[slug]:null)||(Object.hasOwn(commonsPhotos,nameKey)?commonsPhotos[nameKey]:null);
  const version=entry?.version||"3.0";
- const fallback=entry?{url:entry.direct||"https://commons.wikimedia.org/wiki/Special:FilePath/"+encodeURIComponent(entry.file),artist:entry.artist,license:"CC BY "+version,license_url:"https://creativecommons.org/licenses/by/"+version+"/",source_page:"https://commons.wikimedia.org/wiki/File:"+encodeURIComponent(entry.file)}:null;
+ const fallback=entry?{url:entry.direct||"https://commons.wikimedia.org/wiki/Special:FilePath/"+encodeURIComponent(entry.file),artist:entry.artist,license:(entry.sa?"CC BY-SA ":"CC BY ")+version,license_url:"https://creativecommons.org/licenses/"+(entry.sa?"by-sa":"by")+"/"+version+"/",source_page:"https://commons.wikimedia.org/wiki/File:"+encodeURIComponent(entry.file)}:null;
  const photo=fallback||(Array.isArray(d.images)?d.images:[]).find(x=>x&&safeURL(x.url)&&x.artist&&x.license);
  if(!photo)return figure;
  const img=el("img","");img.alt=d.name;img.decoding="async";img.loading="eager";img.referrerPolicy="no-referrer";img.hidden=true;
