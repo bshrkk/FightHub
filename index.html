@@ -431,28 +431,28 @@ async function wikiPortraitRequest(host,params){
 }
 function wikiPortrait(d){
  const name=String(d.name||"").trim(),dob=String(d.dob||d.dateOfBirth||"").slice(0,10);
- if(!name||!/^\d{4}-\d{2}-\d{2}$/.test(dob))return Promise.resolve(null);
+ if(!name||!/^\d{4}-\d{2}-\d{2}$/.test(dob))return Promise.resolve({reason:"Full date of birth unavailable"});
  const key=name.toLowerCase()+"|"+dob;
  if(wikiPortraitCache.has(key))return wikiPortraitCache.get(key);
  const task=wikiPortraitQueue.then(async()=>{
  const s=await wikiPortraitRequest("www.wikidata.org",{action:"wbsearchentities",search:name,language:"en",limit:"5"});
- const ids=(s.search||[]).filter(x=>/^Q\d+$/.test(x.id)).map(x=>x.id);if(!ids.length)return null;
+ const ids=(s.search||[]).filter(x=>/^Q\d+$/.test(x.id)).map(x=>x.id);if(!ids.length)return {reason:"No Wikidata search match"};
  const e=await wikiPortraitRequest("www.wikidata.org",{action:"wbgetentities",ids:ids.join("|"),props:"claims|labels|aliases",languages:"en"});
  const norm=x=>String(x||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
  const claims=(x,p)=>(x.claims?.[p]||[]).filter(y=>y.rank!=="deprecated").map(y=>y.mainsnak?.datavalue?.value);
  const matches=Object.values(e.entities||{}).filter(x=>[x.labels?.en?.value,...(x.aliases?.en||[]).map(a=>a.value)].some(n=>norm(n)===norm(name))&&claims(x,"P31").some(v=>v?.id==="Q5")&&claims(x,"P569").some(v=>v?.precision>=11&&v.time?.slice(1,11)===dob));
- if(matches.length!==1)return null;
- const file=claims(matches[0],"P18").find(v=>typeof v==="string");if(!file)return null;
+ if(matches.length!==1)return {reason:"No unique name and birth date match"};
+ const file=claims(matches[0],"P18").find(v=>typeof v==="string");if(!file)return {reason:"No photograph linked in Wikidata"};
  const j=await wikiPortraitRequest("commons.wikimedia.org",{action:"query",titles:"File:"+file,prop:"imageinfo",iiprop:"url|extmetadata|mime",iiurlwidth:"640"});
- const info=Object.values(j.query?.pages||{})[0]?.imageinfo?.[0],m=info?.extmetadata;if(!m||!/^image\/(jpeg|png|webp)$/.test(info.mime))return null;
+ const info=Object.values(j.query?.pages||{})[0]?.imageinfo?.[0],m=info?.extmetadata;if(!m||!/^image\/(jpeg|png|webp)$/.test(info.mime))return {reason:"Image metadata or supported format unavailable"};
  const license=m.LicenseShortName?.value||"",licenseURL=m.LicenseUrl?.value||"";
- if(!/^CC BY(?:-SA)? [234]\.\d$/.test(license)||!/^https?:\/\/creativecommons\.org\/licenses\/by(?:-sa)?\/[234]\.\d\/(?:[a-z-]+\/)?$/i.test(licenseURL)||m.Restrictions?.value||m.Attribution?.value)return null;
+ if(!/^CC BY(?:-SA)? [234]\.\d$/.test(license)||!/^https?:\/\/creativecommons\.org\/licenses\/by(?:-sa)?\/[234]\.\d\/(?:[a-z-]+\/)?$/i.test(licenseURL)||m.Restrictions?.value||m.Attribution?.value)return {reason:"Licence or attribution requires manual review"};
  const plain=v=>{const doc=new DOMParser().parseFromString(String(v||""),"text/html");return doc.body.textContent.trim();};
- const artist=plain(m.Artist?.value);if(!artist||artist.length>300)return null;
+ const artist=plain(m.Artist?.value);if(!artist||artist.length>300)return {reason:"Photographer credit requires manual review"};
  const url=info.thumburl||info.url,source=info.descriptionurl;
- if(new URL(url).hostname!=="upload.wikimedia.org"||new URL(source).hostname!=="commons.wikimedia.org")return null;
+ if(new URL(url).hostname!=="upload.wikimedia.org"||new URL(source).hostname!=="commons.wikimedia.org")return {reason:"Image source requires manual review"};
  return {url,artist,license,license_url:licenseURL.replace(/^http:/,"https:"),source_page:source};
- }).catch(()=>null);
+ }).catch(()=>({reason:"Wikimedia request failed or timed out"}));
  wikiPortraitCache.set(key,task);wikiPortraitQueue=task.then(()=>new Promise(resolve=>setTimeout(resolve,500)));return task;
 }
 
@@ -494,7 +494,7 @@ function fighterPortrait(d,allowLookup=false){
  const img=el("img","");img.alt=d.name;img.decoding="async";img.loading="eager";img.referrerPolicy="no-referrer";img.hidden=true;
  img.onload=()=>{placeholder.hidden=true;img.hidden=false;caption.replaceChildren(document.createTextNode("Photo: "+photo.artist+" · "));const license=safeURL(photo.license_url);if(license){const a=el("a","",photo.license);a.href=license;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}else caption.append(document.createTextNode(photo.license));const source=safeURL(photo.source_page);if(source){const a=el("a",""," · Source");a.href=source;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}};
  img.onerror=()=>{img.remove();placeholder.hidden=false;caption.textContent="Photograph unavailable";if(allowLookup&&photo===fallback)lookup();};frame.append(img);img.src=safeURL(photo.url);};
- const lookup=()=>{caption.textContent="Looking for a licensed photograph…";wikiPortrait(d).then(p=>{if(p)displayPhoto(p);else caption.textContent="Photograph unavailable";});};
+ const lookup=()=>{caption.textContent="Looking for a licensed photograph…";wikiPortrait(d).then(p=>{if(p?.url)displayPhoto(p);else caption.textContent="Photograph unavailable · "+(p?.reason||"No suitable image");});};
  if(photo)displayPhoto(photo);else if(allowLookup)lookup();return figure;
 }
 function citoOutcome(b,d){
