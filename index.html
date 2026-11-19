@@ -440,7 +440,7 @@ function fighterPortrait(d){
  const fallback=entry?{url:"https://commons.wikimedia.org/wiki/Special:FilePath/"+encodeURIComponent(entry.file),artist:entry.artist,license:"CC BY "+version,license_url:"https://creativecommons.org/licenses/by/"+version+"/",source_page:"https://commons.wikimedia.org/wiki/File:"+encodeURIComponent(entry.file)}:null;
  const photo=(Array.isArray(d.images)?d.images:[]).find(x=>x&&safeURL(x.url)&&x.artist&&x.license)||fallback;
  if(!photo)return figure;
- const img=el("img","");img.alt=d.name;img.decoding="async";img.loading="lazy";img.referrerPolicy="no-referrer";img.hidden=true;
+ const img=el("img","");img.alt=d.name;img.decoding="async";img.loading="eager";img.referrerPolicy="no-referrer";img.hidden=true;
  img.onload=()=>{placeholder.hidden=true;img.hidden=false;caption.replaceChildren(document.createTextNode("Photo: "+photo.artist+" · "));const license=safeURL(photo.license_url);if(license){const a=el("a","",photo.license);a.href=license;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}else caption.append(document.createTextNode(photo.license));const source=safeURL(photo.source_page);if(source){const a=el("a",""," · Source");a.href=source;a.target="_blank";a.rel="noopener noreferrer";caption.append(a);}};
  img.onerror=()=>{img.remove();placeholder.hidden=false;caption.textContent="Photograph unavailable";};frame.append(img);img.src=safeURL(photo.url);return figure;
 }
